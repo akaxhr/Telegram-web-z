@@ -64,8 +64,8 @@ async function init() {
     }
   });
 
-  await initGlobal();
-  getActions().init();
+await initGlobal();
+getActions().init();
 
   getActions().updateShouldEnableDebugLog();
   getActions().updateShouldDebugExportedSenders();

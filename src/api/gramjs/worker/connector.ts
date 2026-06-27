@@ -4,7 +4,6 @@ import type { ApiError, ApiInitialArgs, ApiOnProgress, OnApiUpdate } from '../..
 import type { LocalDb } from '../localDb';
 import type { MethodArgs, MethodResponse, Methods } from '../methods/types';
 import type { OriginPayload, ThenArg, WorkerMessageEvent } from './types';
-
 import { DEBUG, IGNORE_UNHANDLED_ERRORS } from '../../../config';
 import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_SAFARI } from '../../../util/browser/windowEnvironment';
@@ -14,6 +13,7 @@ import { getCurrentTabId, subscribeToMasterChange } from '../../../util/establis
 import generateUniqueId from '../../../util/generateUniqueId';
 import { ACCOUNT_SLOT, DATA_BROADCAST_CHANNEL_NAME } from '../../../util/multiaccount';
 import { pause, throttleWithTickEnd } from '../../../util/schedulers';
+import { callApiClient } from '../../client';
 
 type RequestState = {
   messageId: string;
@@ -81,56 +81,27 @@ let isInited = false;
 
 export function initApi(onUpdate: OnApiUpdate, initialArgs: ApiInitialArgs) {
   updateCallback = onUpdate;
+  isInited = true;
 
-  if (!isMasterTab) {
-    initApiOnMasterTab(initialArgs);
-    return Promise.resolve();
-  }
+ onUpdate({ '@type': 'updateApiReady' });
 
-  if (!worker) {
-    if (DEBUG) {
-      // eslint-disable-next-line no-console
-      console.log('>>> START LOAD WORKER');
-    }
+onUpdate({
+  '@type': 'updateAuthorizationState',
+  authorizationState: 'authorizationStateReady',
+});
 
-    const params = new URLSearchParams();
-    if (ACCOUNT_SLOT) {
-      params.set('account', String(ACCOUNT_SLOT));
-    }
-
-    worker = new Worker(new URL('./worker.ts', import.meta.url), {
-      name: params.toString(),
-      type: 'module',
-    });
-    subscribeToWorker(onUpdate);
-
-    if (IS_SAFARI || (initialArgs.platform === 'macOS' && IS_TAURI)) {
-      setupHealthCheck();
-    }
-  }
-
-  return makeRequest({
-    type: 'initApi',
-    args: [initialArgs, savedLocalDb],
-  }).then(() => {
-    isInited = true;
-
-    apiRequestsQueue.forEach((request) => {
-      callApi(request.fnName, ...request.args)
-        .then(request.deferred.resolve)
-        .catch(request.deferred.reject);
-    });
-    apiRequestsQueue = [];
-
-    localApiRequestsQueue.forEach((request) => {
-      callApiLocal(request.fnName, ...request.args)
-        .then(request.deferred.resolve)
-        .catch(request.deferred.reject);
-    });
-    localApiRequestsQueue = [];
+  apiRequestsQueue.forEach((request) => {
+    request.deferred.resolve(undefined);
   });
-}
+  apiRequestsQueue = [];
 
+  localApiRequestsQueue.forEach((request) => {
+    request.deferred.resolve(undefined);
+  });
+  localApiRequestsQueue = [];
+
+  return Promise.resolve();
+}
 export function updateLocalDb(name: keyof LocalDb, prop: string, value: any) {
   savedLocalDb[name][prop] = value;
 }
@@ -204,51 +175,35 @@ export function callApiLocal<T extends keyof Methods>(
   return promise as EnsurePromise<MethodResponse<T>>;
 }
 
-export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<T>): EnsurePromise<MethodResponse<T>> {
-  if (!isInited && isMasterTab) {
-    if (NO_QUEUE_BEFORE_INIT.has(fnName)) {
-      return Promise.resolve(undefined) as EnsurePromise<MethodResponse<T>>;
-    }
+export async function callApi<T extends keyof Methods>(
+  fnName: T,
+  ...args: MethodArgs<T>
+): EnsurePromise<MethodResponse<T>> {
+  const acarthubMethods = new Set([
+    'loadAllChats',
+    'oldFetchLangPack',
+'fetchLangStrings',
+'fetchLanguage',
+'fetchLangPack',
+    'fetchMessages',
+    'sendMessage',
+    'fetchChat',
+  ]);
+  
 
-    const deferred = new Deferred();
-    apiRequestsQueue.push({ fnName, args, deferred });
-
-    return deferred.promise as EnsurePromise<MethodResponse<T>>;
+  if (acarthubMethods.has(String(fnName))) {
+    const result = await callApiClient(String(fnName), args);
+    console.log('[ACARTHUB API]', fnName, result);
+    return result as MethodResponse<T>;
   }
 
-  const promise = isMasterTab ? makeRequest({
+  const result = await makeRequest({
     type: 'callMethod',
-    name: fnName,
-    args,
-  }) : makeRequestToMaster({
     name: fnName,
     args,
   });
 
-  // Some TypeScript magic to make sure `VirtualClass` is never returned from any method
-  if (DEBUG) {
-    (async () => {
-      try {
-        type ForbiddenTypes =
-          Api.VirtualClass<any>
-          | (Api.VirtualClass<any> | undefined)[];
-        type ForbiddenResponses =
-          ForbiddenTypes
-          | (AnyLiteral & Record<string, ForbiddenTypes>);
-
-        // Unwrap all chained promises
-        const response = await promise;
-        // Make sure responses do not include `VirtualClass` instances
-        const allowedResponse: Exclude<typeof response, ForbiddenResponses> = response;
-        // Suppress "unused variable" constraint
-        void allowedResponse;
-      } catch (err) {
-        // Do noting
-      }
-    })();
-  }
-
-  return promise as EnsurePromise<MethodResponse<T>>;
+  return result as EnsurePromise<MethodResponse<T>>;
 }
 
 export function cancelApiProgress(progressCallback: ApiOnProgress) {

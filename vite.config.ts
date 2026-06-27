@@ -74,7 +74,7 @@ export default defineConfig(({ mode }): UserConfig => {
   const defaultAppTitle = `Telegram${appEnv !== 'production' ? ' Beta' : ''}`;
   const baseUrl = env.BASE_URL || PRODUCTION_URL;
   const appTitle = env.APP_TITLE || defaultAppTitle;
-  const isProductionApp = appEnv === 'production';
+  const isProductionApp = appEnv === 'production'; 
   const appleIcon = isProductionApp ? 'apple-touch-icon' : 'apple-touch-icon-dev';
   const mainIcon = isProductionApp ? 'icon-192x192' : 'icon-dev-192x192';
   const manifest = isProductionApp ? 'site.webmanifest' : 'site_dev.webmanifest';
@@ -152,10 +152,14 @@ export default defineConfig(({ mode }): UserConfig => {
 
   const shouldCollectWorkerReportBundles = bundleStatsVisualizerValue === '1' || bundleStatsValue === '1';
 
+// Icha Panel doesn't use Telegram authentication.
+const useTelegramBackend = false;
+
+if (useTelegramBackend) {
   if (appEnv !== 'test' && (!telegramApiId || !telegramApiHash)) {
     throw new Error('Missing required Telegram API credentials');
   }
-
+}
   setViteEnv({
     TG_APP_ENV: appEnv,
     TG_APP_MOCKED_CLIENT: appMockedClient,
@@ -166,8 +170,8 @@ export default defineConfig(({ mode }): UserConfig => {
     TG_APPLE_ICON: appleIcon,
     TG_MAIN_ICON: mainIcon,
     TG_MANIFEST: manifest,
-    TG_TELEGRAM_API_ID: telegramApiId,
-    TG_TELEGRAM_API_HASH: telegramApiHash,
+  TG_TELEGRAM_API_ID: telegramApiId || "0",
+TG_TELEGRAM_API_HASH: telegramApiHash || "ICHA_PANEL",
     TG_TEST_SESSION: env.TEST_SESSION || '',
   });
 

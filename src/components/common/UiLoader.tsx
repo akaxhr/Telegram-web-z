@@ -176,16 +176,18 @@ const UiLoader: FC<OwnProps & StateProps> = ({
 
 export default withGlobal<OwnProps>(
   (global, { isMobile }): Complete<StateProps> => {
-    const tabState = selectTabState(global);
-
-    const { foldersPosition } = selectSharedSettings(global);
+    const tabState = selectTabState(global) || {};
+    const sharedSettings = selectSharedSettings(global) || {};
+    const foldersPosition = sharedSettings.foldersPosition;
 
     return {
-      shouldSkipHistoryAnimations: tabState.shouldSkipHistoryAnimations,
-      uiReadyState: tabState.uiReadyState,
-      isRightColumnShown: selectIsRightColumnShown(global, isMobile),
-      leftColumnWidth: global.leftColumnWidth,
-      isFoldersSidebarShown: foldersPosition === FOLDERS_POSITION_LEFT && !isMobile && selectAreFoldersPresent(global),
+      shouldSkipHistoryAnimations: Boolean(tabState.shouldSkipHistoryAnimations),
+      uiReadyState: tabState.uiReadyState || 2,
+      isRightColumnShown: false,
+      leftColumnWidth: global.leftColumnWidth || 420,
+      isFoldersSidebarShown: Boolean(
+        foldersPosition === FOLDERS_POSITION_LEFT && !isMobile && selectAreFoldersPresent(global)
+      ),
     };
   },
 )(UiLoader);

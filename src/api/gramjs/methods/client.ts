@@ -8,7 +8,6 @@ import type { TwoFaParams } from '../../../lib/gramjs/client/2fa';
 import TelegramClient from '../../../lib/gramjs/client/TelegramClient';
 import { RPCError } from '../../../lib/gramjs/errors';
 import { Logger as GramJsLogger } from '../../../lib/gramjs/extensions/index';
-
 import type { ThreadId } from '../../../types';
 import type {
   ApiInitialArgs,
@@ -57,16 +56,8 @@ import {
   updateChannelState,
 } from '../updates/updateManager';
 import {
-  onAuthError,
   onAuthReady,
   onCurrentUserUpdate,
-  onPasskeyOption,
-  onRequestCode,
-  onRequestPassword,
-  onRequestPhoneNumber,
-  onRequestQrCode,
-  onRequestRegistration,
-  onWebAuthTokenFailed,
 } from './auth';
 import downloadMediaWithClient, { parseMediaUrl } from './media';
 
@@ -138,22 +129,9 @@ export async function init(initialArgs: ApiInitialArgs, onConnected?: NoneToVoid
 
     try {
       client.setPingCallback(getDifference);
-      await client.start({
-        phoneNumber: onRequestPhoneNumber,
-        phoneCode: onRequestCode,
-        password: onRequestPassword,
-        firstAndLastNames: onRequestRegistration,
-        onPasskeyOption,
-        qrCode: onRequestQrCode,
-        onError: onAuthError,
-        initialMethod: platform === 'iOS' || platform === 'Android' ? 'phoneNumber' : 'qrCode',
-        shouldThrowIfUnauthorized: Object.values(sessionData?.keys || {}).length > 0,
-        webAuthToken,
-        webAuthTokenFailed: onWebAuthTokenFailed,
-        mockScenario,
-        accountIds,
-        hasPasskeySupport,
-      }, onConnected);
+      if (DEBUG) {
+  console.log('Telegram login disabled');
+}
     } catch (err: any) {
       // eslint-disable-next-line no-console
       console.error(err);
@@ -180,7 +158,7 @@ export async function init(initialArgs: ApiInitialArgs, onConnected?: NoneToVoid
 
     initUpdatesManager(invokeRequest);
 
-    void fetchCurrentUser();
+   // void fetchCurrentUser();
   } catch (err) {
     if (DEBUG) {
       log('CONNECTING ERROR', err);
@@ -303,7 +281,12 @@ export async function invokeRequest<T extends GramJs.AnyRequest>(
       log('INVOKE', request.className);
     }
 
-    const result = await client.invoke(request, dcId, abortSignal, shouldRetryOnTimeout);
+  const result = await client.invoke(
+  request,
+  dcId,
+  abortSignal,
+  shouldRetryOnTimeout,
+);
 
     processAndUpdateEntities(result);
 

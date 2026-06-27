@@ -89,10 +89,10 @@ addActionHandler('apiUpdate', (global, actions, update): ActionReturnType => {
       break;
 
     case 'requestSync':
-      resetOpenedChannelShortpollState();
-      syncOpenedShortpollChannelIds(global);
-      actions.sync();
-      break;
+  if (typeof actions.sync === 'function') {
+    actions.sync();
+  }
+  break;
 
     case 'updateFetchingDifference':
       global = { ...global, isFetchingDifference: update.isFetching };

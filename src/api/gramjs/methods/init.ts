@@ -16,15 +16,22 @@ export function initApi(_onUpdate: OnApiUpdate, initialArgs: ApiInitialArgs, ini
   initUpdateEmitter(_onUpdate);
 
   if (initialLocalDb) updateFullLocalDb(initialLocalDb);
-
-  const connectDeferred = new Deferred<void>();
-  initClient(initialArgs, () => connectDeferred.resolve());
-  return connectDeferred.promise;
+return Promise.resolve();
 }
 
 export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<T>): MethodResponse<T> {
-  // @ts-ignore
-  return methods[fnName](...args) as MethodResponse<T>;
+  console.log('Worker skipped:', fnName);
+
+  switch (fnName) {
+    case 'loadAllChats':
+    case 'loadConfig':
+    case 'loadAppConfig':
+    case 'loadContactList':
+      return true as MethodResponse<T>;
+
+    default:
+      return undefined as MethodResponse<T>;
+  }
 }
 
 export function cancelApiProgress(progressCallback: ApiOnProgress) {

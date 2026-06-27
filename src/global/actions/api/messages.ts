@@ -181,119 +181,28 @@ const uploadProgressCallbacks = new Map<MessageKey, ApiOnProgress>();
 
 const runDebouncedForMarkRead = debounce((cb) => cb(), 500, false);
 
-addActionHandler('loadViewportMessages', (global, actions, payload): ActionReturnType => {
-  const {
-    direction = LoadMoreDirection.Around,
-    isBudgetPreload = false,
-    shouldForceRender = false,
-    forceLastSlice = false,
-    onLoaded,
-    onError,
-    tabId = getCurrentTabId(),
-  } = payload || {};
+addActionHandler('loadViewportMessages', async (global, actions, payload): Promise<void> => {
+  const tabId = payload?.tabId ?? getCurrentTabId();
+  const chatId = payload?.chatId ?? selectCurrentMessageList(global, tabId)?.chatId ?? '1';
+  const threadId = payload?.threadId ?? MAIN_THREAD_ID;
 
-  let { chatId, threadId } = payload || {};
+  const result = await callApi('fetchMessages');
 
-  if (!chatId || !threadId) {
-    const currentMessageList = selectCurrentMessageList(global, tabId);
-    if (!currentMessageList) {
-      onError?.();
-      return;
-    }
+  if (!result) return;
 
-    chatId = currentMessageList.chatId;
-    threadId = currentMessageList.threadId;
-  }
+  global = getGlobal();
 
-  const chat = selectChat(global, chatId);
-  const isRestricted = selectIsChatRestricted(global, chatId);
-  // TODO Revise if `isRestricted` check is needed
-  if (!chat || isRestricted) {
-    onError?.();
-    return;
-  }
+  const byId = buildCollectionByKey(result.messages, 'id');
+  const ids = result.messages.map((message) => message.id);
 
-  const viewportIds = selectViewportIds(global, chatId, threadId, tabId);
-  const listedIds = selectListedIds(global, chatId, threadId);
+  global = addChatMessagesById(global, chatId, byId);
+  global = updateListedIds(global, chatId, threadId, ids);
+  global = safeReplaceViewportIds(global, chatId, threadId, ids, tabId);
+  global = updateThreadInfoMessagesCount(global, chatId, threadId, result.count);
 
-  if (!viewportIds || !viewportIds.length || direction === LoadMoreDirection.Around) {
-    const offsetId = !forceLastSlice ? (
-      selectFocusedMessageId(global, chatId, tabId) || selectRealLastReadId(global, chatId, threadId)
-    ) : undefined;
-    const isOutlying = Boolean(offsetId && listedIds && !listedIds.includes(offsetId));
-    const historyIds = (isOutlying
-      ? selectOutlyingListByMessageId(global, chatId, threadId, offsetId!)
-      : listedIds) || [];
-    const {
-      newViewportIds, areSomeLocal, areAllLocal,
-    } = getViewportSlice(historyIds, offsetId, LoadMoreDirection.Around);
+  setGlobal(global);
 
-    if (areSomeLocal) {
-      global = safeReplaceViewportIds(global, chatId, threadId, newViewportIds, tabId);
-    }
-
-    if (!areAllLocal) {
-      onTickEnd(() => {
-        void loadViewportMessages(
-          global, chat, threadId, offsetId, LoadMoreDirection.Around, isOutlying, isBudgetPreload, onLoaded, tabId,
-        );
-      });
-    } else {
-      onLoaded?.();
-    }
-  } else {
-    const offsetId = !forceLastSlice ? (
-      direction === LoadMoreDirection.Backwards ? viewportIds[0] : viewportIds[viewportIds.length - 1]
-    ) : undefined;
-
-    // Prevent requests with local offsets
-    if (offsetId && isLocalMessageId(offsetId)) return;
-
-    // Prevent unnecessary requests in threads
-    if (offsetId === threadId && direction === LoadMoreDirection.Backwards) return;
-
-    if (direction === LoadMoreDirection.Forwards && offsetId) {
-      const threadInfo = selectThreadInfo(global, chatId, threadId);
-      if (threadInfo?.lastMessageId && offsetId >= threadInfo.lastMessageId) {
-        return;
-      }
-    }
-
-    const isOutlying = Boolean(listedIds && offsetId && !listedIds.includes(offsetId));
-    const historyIds = (isOutlying
-      ? selectOutlyingListByMessageId(global, chatId, threadId, offsetId!) : listedIds)!;
-    if (historyIds?.length) {
-      const {
-        newViewportIds, areSomeLocal, areAllLocal,
-      } = getViewportSlice(historyIds, offsetId, direction);
-
-      if (areSomeLocal) {
-        global = safeReplaceViewportIds(global, chatId, threadId, newViewportIds, tabId);
-      }
-
-      onTickEnd(() => {
-        void loadWithBudget(
-          global,
-          actions,
-          areAllLocal,
-          isOutlying,
-          isBudgetPreload,
-          chat,
-          threadId,
-          direction,
-          offsetId,
-          onLoaded,
-          tabId,
-        );
-      });
-    }
-
-    if (isBudgetPreload) {
-      return;
-    }
-  }
-
-  setGlobal(global, { forceOnHeavyAnimation: shouldForceRender });
+  payload?.onLoaded?.();
 });
 
 async function loadWithBudget<T extends GlobalState>(
@@ -2014,6 +1923,7 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
     }
   }
 }
+
 
 async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
   // @optimization

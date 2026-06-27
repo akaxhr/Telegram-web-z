@@ -333,8 +333,8 @@ const Main = ({
   }, [isMasterTab, isSynced]);
 
   // Initial API calls
-  useEffect(() => {
-    if (isMasterTab && isSynced && isAppConfigLoaded && !isAccountFrozen) {
+useEffect(() => {
+  if (isMasterTab) {
       loadAllChats({ listType: 'saved' });
       loadAllStories();
       loadAllHiddenStories();

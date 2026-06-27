@@ -934,7 +934,7 @@ addCallback((global: GlobalState) => {
 
   const isLockedUpdated = global.passcode.isScreenLocked !== prevIsScreenLocked;
   const blurredTabsCount = Object.values(global.byTabId).filter((l) => l.isBlurred).length;
-  const isMasterTab = selectTabState(global, getCurrentTabId()).isMasterTab;
+  const isMasterTab = selectTabState(global)?.isMasterTab
 
   if (isLockedUpdated) {
     updatePageTitle();
