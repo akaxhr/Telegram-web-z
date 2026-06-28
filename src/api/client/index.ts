@@ -41,7 +41,7 @@ export async function callApiClient(method: string, payload?: any) {
   console.warn('[BACKEND METHOD]', backendMethod);
 
   try {
-    const response = await fetch('http://localhost:3001/api/client/request', {
+    const response = await fetch('/api/client/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
