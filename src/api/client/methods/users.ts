@@ -37,7 +37,10 @@ export async function fetchFullUser({
     return undefined;
   }
 
-  const result = await invokeRequest(new GramJs.users.GetFullUser({ id: input }));
+ const result = await request(
+  "users.getFullUser",
+  { id: input },
+);
 
   if (!result) {
     return undefined;
@@ -91,12 +94,13 @@ export async function fetchFullUser({
 }
 
 export async function fetchCommonChats({ user, maxId }: { user: ApiUser; maxId?: string }) {
-  const result = await invokeRequest(new GramJs.messages.GetCommonChats({
-    userId: buildInputUser(user.id, user.accessHash),
-    maxId: maxId
-      ? buildMtpPeerId(maxId, getEntityTypeById(maxId)) : DEFAULT_PRIMITIVES.BIGINT,
-    limit: DEFAULT_PRIMITIVES.INT,
-  }));
+  const result = await request(
+  "users.getCommonChats",
+  {
+    user,
+    maxId,
+  },
+);
 
   if (!result) {
     return undefined;
@@ -110,9 +114,12 @@ export async function fetchCommonChats({ user, maxId }: { user: ApiUser; maxId?:
 }
 
 export async function fetchPaidMessagesStarsAmount(user: ApiUser) {
-  const result = await invokeRequest(new GramJs.users.GetRequirementsToContact({
-    id: [buildInputUser(user.id, user.accessHash)],
-  }));
+ const result = await request(
+  "users.getRequirementsToContact",
+  {
+    userId: user.id,
+  },
+);
 
   if (!result?.[0]) {
     return undefined;
@@ -127,13 +134,17 @@ export async function fetchPaidMessagesStarsAmount(user: ApiUser) {
 }
 
 export async function fetchNearestCountry() {
-  const dcInfo = await invokeRequest(new GramJs.help.GetNearestDc());
+ const dcInfo = await request(
+  "users.getNearestDc",
+);
 
   return dcInfo?.country;
 }
 
 export async function fetchContactList() {
-  const result = await invokeRequest(new GramJs.contacts.GetContacts({ hash: DEFAULT_PRIMITIVES.BIGINT }));
+  const result = await request(
+  "users.getContacts",
+);
   if (!result || result instanceof GramJs.contacts.ContactsNotModified) {
     return undefined;
   }
@@ -148,9 +159,12 @@ export async function fetchContactList() {
 }
 
 export async function fetchUsers({ users }: { users: ApiUser[] }) {
-  const result = await invokeRequest(new GramJs.users.GetUsers({
-    id: users.map(({ id, accessHash }) => buildInputUser(id, accessHash)),
-  }));
+  const result = await request(
+  "users.getUsers",
+  {
+    userIds: users.map((u) => u.id),
+  },
+);
   if (!result || !result.length) {
     return undefined;
   }
@@ -173,13 +187,18 @@ export async function importContact({
   firstName?: string;
   lastName?: string;
 }) {
-  const result = await invokeRequest(new GramJs.contacts.ImportContacts({
-    contacts: [buildInputContact({
-      phone,
-      firstName,
-      lastName,
-    })],
-  }));
+ const result = await request(
+  "users.importContacts",
+  {
+    contacts: [
+      {
+        phone,
+        firstName,
+        lastName,
+      },
+    ],
+  },
+);
 
   if (result instanceof GramJs.contacts.ImportedContacts && result.users.length) {
     addUserToLocalDb(result.users[0]);
@@ -205,16 +224,20 @@ export function updateContact({
   shouldSharePhoneNumber?: boolean;
   note?: ApiFormattedText;
 }) {
-  return invokeRequest(new GramJs.contacts.AddContact({
-    id: buildInputUser(id, accessHash),
+return request(
+  "users.addContact",
+  {
+    id,
     firstName,
     lastName,
-    phone: phoneNumber,
-    addPhonePrivacyException: shouldSharePhoneNumber || undefined,
-    note: note ? buildInputTextWithEntities(note) : undefined,
-  }), {
+    phoneNumber,
+    shouldSharePhoneNumber,
+    note,
+  },
+  {
     shouldReturnTrue: true,
-  });
+  },
+);
 }
 
 export async function deleteContact({
@@ -229,26 +252,34 @@ export async function deleteContact({
     return;
   }
 
-  const result = await invokeRequest(new GramJs.contacts.DeleteContacts({ id: [input] }));
-
-  if (!result) {
-    return;
-  }
-
-  sendApiUpdate({
-    '@type': 'deleteContact',
+  const result = await request(
+  "users.deleteContact",
+  {
     id,
-  });
+  },
+);
+
+if (!result) {
+  return;
+}
+
+sendApiUpdate({
+  "@type": "deleteContact",
+  id,
+});
 }
 
 export async function toggleNoPaidMessagesException({ user, shouldRefundCharged }: {
   user: ApiUser;
   shouldRefundCharged?: boolean;
 }) {
-  const result = await invokeRequest(new GramJs.account.ToggleNoPaidMessagesException ({
-    refundCharged: shouldRefundCharged ? true : undefined,
-    userId: buildInputUser(user.id, user.accessHash),
-  }));
+ const result = await request(
+  "users.toggleNoPaidMessagesException",
+  {
+    userId: user.id,
+    shouldRefundCharged,
+  },
+);
   return result;
 }
 
@@ -256,9 +287,12 @@ export async function fetchPaidMessagesRevenue({ user }: {
   user: ApiUser;
   shouldRefundCharged?: boolean;
 }) {
-  const result = await invokeRequest(new GramJs.account.GetPaidMessagesRevenue({
-    userId: buildInputUser(user.id, user.accessHash),
-  }));
+  const result = await request(
+  "users.getPaidMessagesRevenue",
+  {
+    userId: user.id,
+  },
+);
   if (!result) return undefined;
   return toJSNumber(result.starsAmount);
 }
@@ -277,12 +311,14 @@ export async function fetchProfilePhotos({
   if (user) {
     const { id, accessHash } = user;
 
-    const result = await invokeRequest(new GramJs.photos.GetUserPhotos({
-      userId: buildInputUser(id, accessHash),
-      limit,
-      offset,
-      maxId: DEFAULT_PRIMITIVES.BIGINT,
-    }));
+    const result = await request(
+  "users.getUserPhotos",
+  {
+    userId: id,
+    limit,
+    offset,
+  },
+);
 
     if (!result) {
       return undefined;
@@ -328,38 +364,56 @@ export async function fetchProfilePhotos({
 export function reportSpam(userOrChat: ApiPeer) {
   const { id, accessHash } = userOrChat;
 
-  return invokeRequest(new GramJs.messages.ReportSpam({
-    peer: buildInputPeer(id, accessHash),
-  }), {
+  return request(
+  "users.reportSpam",
+  {
+    id,
+  },
+  {
     shouldReturnTrue: true,
-  });
+  },
+);
 }
 
 export function updateEmojiStatus(emojiStatus: ApiEmojiStatusType) {
-  return invokeRequest(new GramJs.account.UpdateEmojiStatus({
-    emojiStatus: buildInputEmojiStatus(emojiStatus),
-  }), {
+return request(
+  "users.updateEmojiStatus",
+  {
+    emojiStatus,
+  },
+  {
     shouldReturnTrue: true,
-  });
+  },
+);
 }
 
 export function saveCloseFriends(userIds: string[]) {
   const id = userIds.map((userId) => buildMtpPeerId(userId, 'user'));
 
-  return invokeRequest(new GramJs.contacts.EditCloseFriends({ id }), {
+ return request(
+  "users.editCloseFriends",
+  {
+    ids: id,
+  },
+  {
     shouldReturnTrue: true,
-  });
+  },
+);
 }
 
 export function updateContactNote(user: ApiUser, note: ApiFormattedText) {
   const { id, accessHash } = user;
 
-  return invokeRequest(new GramJs.contacts.UpdateContactNote({
-    id: buildInputUser(id, accessHash),
-    note: buildInputTextWithEntities(note),
-  }), {
+ return request(
+  "users.updateContactNote",
+  {
+    id,
+    note,
+  },
+  {
     shouldReturnTrue: true,
-  });
+  },
+);
 }
 
 export function toggleNoForwards({
@@ -371,11 +425,15 @@ export function toggleNoForwards({
   isEnabled: boolean;
   requestMsgId?: number;
 }) {
-  return invokeRequest(new GramJs.messages.ToggleNoForwards({
-    peer: buildInputPeer(user.id, user.accessHash),
-    enabled: isEnabled,
+ return request(
+  "users.toggleNoForwards",
+  {
+    userId: user.id,
+    isEnabled,
     requestMsgId,
-  }), {
+  },
+  {
     shouldReturnTrue: true,
-  });
+  },
+);
 }

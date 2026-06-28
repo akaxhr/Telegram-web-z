@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  "https://zpilbjbvepwurrquwolb.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwaWxiamJ2ZXB3dXJycXV3b2xiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjU4MDAwOCwiZXhwIjoyMDk4MTU2MDA4fQ.hSgInSden9Pu0efS0yhKLdpNaVmMvNfssB6cZtVTg9M"
 );
 
 function emptyMessages(extra = {}) {
@@ -44,18 +44,74 @@ function chatIdFrom(payload = {}) {
 async function loadMessagesByChat(payload = {}) {
   const chatId = chatIdFrom(payload);
 
-  const { data, error } = await supabase
+  const { data: messageRows, error: msgError } = await supabase
     .from("tg_messages")
     .select("*")
     .eq("chat_id", chatId)
+    .eq("is_deleted", false)
     .order("date", { ascending: true });
 
-  if (error) throw error;
+  if (msgError) throw msgError;
 
-  return emptyMessages({
-    messages: data ?? [],
-    count: data?.length ?? 0,
-  });
+  const senderIds = [
+    ...new Set(
+      (messageRows ?? [])
+        .map((m) => m.sender_id)
+        .filter(Boolean)
+    ),
+  ];
+
+  const { data: userRows, error: userError } = senderIds.length
+    ? await supabase.from("tg_users").select("*").in("id", senderIds)
+    : { data: [], error: null };
+
+  if (userError) throw userError;
+
+  const { data: chatRows, error: chatError } = await supabase
+    .from("tg_chats")
+    .select("*")
+    .eq("id", chatId);
+
+  if (chatError) throw chatError;
+
+  const messages = (messageRows ?? []).map((m) => ({
+    id: m.id,
+    chatId: m.chat_id,
+    senderId: m.sender_id,
+    date: m.date,
+    content: m.content,
+    replyInfo: m.reply_info,
+    forwardInfo: m.forward_info,
+    reactions: m.reactions,
+    groupedId: m.grouped_id,
+    sendingState: m.sending_state,
+    editDate: m.edit_date,
+    isOutgoing: m.is_outgoing,
+    isPinned: m.is_pinned,
+  }));
+
+  const users = (userRows ?? []).map((u) => ({
+    id: u.id,
+    firstName: u.first_name ?? "",
+    lastName: u.last_name ?? "",
+    username: u.username ?? undefined,
+    isSelf: false,
+    type: "user",
+  }));
+
+  const chats = (chatRows ?? []).map((c) => ({
+    id: c.id,
+    title: c.title ?? "Chat",
+    type: c.type ?? "group",
+  }));
+
+  return {
+    messages,
+    chats,
+    users,
+    topics: [],
+    count: messages.length,
+  };
 }
 
 async function loadOneMessage(payload = {}) {
@@ -138,10 +194,58 @@ export const messageRoutes = {
     return ok({ updates: [], message: null });
   },
 
-  async "messages.sendMessage"(payload, options) {
-    console.log("messages.sendMessage", payload);
-    return ok({ updates: [], message: null });
-  },
+  async "messages.sendMessage"(payload) {
+  const chatId = payload.chat.id;
+
+  // Temporary until auth/bot is connected
+  const senderId = "user-1";
+
+  const now = Math.floor(Date.now() / 1000);
+  const id = Date.now();
+
+  const row = {
+    id,
+    chat_id: chatId,
+    sender_id: senderId,
+    telegram_message_id: id,
+    date: now,
+
+    content: {
+      type: "text",
+      text: payload.text,
+    },
+
+    reply_info: null,
+    forward_info: null,
+    reactions: null,
+
+    grouped_id: null,
+    sending_state: null,
+    edit_date: null,
+
+    is_outgoing: true,
+    is_pinned: false,
+    is_deleted: false,
+  };
+
+  const { error } = await supabase
+    .from("tg_messages")
+    .insert(row);
+
+  if (error) throw error;
+
+  return {
+    updates: [],
+    message: {
+      id,
+      chatId,
+      senderId,
+      date: now,
+      content: row.content,
+      isOutgoing: true,
+    },
+  };
+},
 
   async "messages.sendMultiMedia"(payload, options) {
     console.log("messages.sendMultiMedia", payload);
@@ -153,10 +257,41 @@ export const messageRoutes = {
     return {};
   },
 
-  async "messages.editMessage"(payload, options) {
-    console.log("messages.editMessage", payload);
-    return ok();
-  },
+  async "messages.editMessage"(payload) {
+  console.log("messages.editMessage", payload);
+
+  const chatId = chatIdFrom(payload);
+  const messageId = payload.messageId ?? payload.id;
+
+  const now = Math.floor(Date.now() / 1000);
+
+  const content = {
+    type: "text",
+    text: payload.text ?? payload.message ?? "",
+  };
+
+  const { error } = await supabase
+    .from("tg_messages")
+    .update({
+      content,
+      edit_date: now,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("chat_id", chatId)
+    .eq("id", messageId);
+
+  if (error) throw error;
+
+  return ok({
+    updates: [],
+    message: {
+      id: messageId,
+      chatId,
+      content,
+      editDate: now,
+    },
+  });
+},
 
   async "messages.editMessageMedia"(payload, options) {
     console.log("messages.editMessageMedia", payload);

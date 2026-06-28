@@ -180,16 +180,56 @@ export async function callApi<T extends keyof Methods>(
   ...args: MethodArgs<T>
 ): EnsurePromise<MethodResponse<T>> {
   const acarthubMethods = new Set([
-    'loadAllChats',
-    'oldFetchLangPack',
-'fetchLangStrings',
-'fetchLanguage',
-'fetchLangPack',
-    'fetchMessages',
-    'sendMessage',
-    'fetchChat',
-  ]);
+  'loadAllChats',
+  'oldFetchLangPack',
+  'fetchLangStrings',
+  'fetchLanguage',
+  'fetchLangPack',
+  'fetchChat',
+]);
   
+  const methodMap: Record<string, string> = {
+  // ==========================
+  // Messages
+  // ==========================
+  fetchMessages: "messages.fetchMessages",
+  fetchMessage: "messages.fetchMessage",
+  fetchRichMessage: "messages.fetchRichMessage",
+  fetchMessagesById: "messages.fetchMessagesByIds",
+
+  sendMessage: "messages.sendMessage",
+  editMessage: "messages.editMessage",
+  deleteMessages: "messages.deleteMessages",
+  fetchMessageViews: "messages.getMessagesViews",
+
+  // ==========================
+  // Users
+  // ==========================
+  getFullUser: "users.getFullUser",
+  getCommonChats: "users.getCommonChats",
+  getRequirementsToContact: "users.getRequirementsToContact",
+  getNearestDc: "users.getNearestDc",
+  getContacts: "users.getContacts",
+  getUsers: "users.getUsers",
+  importContacts: "users.importContacts",
+  addContact: "users.addContact",
+  deleteContact: "users.deleteContact",
+  toggleNoPaidMessagesException: "users.toggleNoPaidMessagesException",
+  getPaidMessagesRevenue: "users.getPaidMessagesRevenue",
+  getUserPhotos: "users.getUserPhotos",
+  reportSpam: "users.reportSpam",
+  updateEmojiStatus: "users.updateEmojiStatus",
+  editCloseFriends: "users.editCloseFriends",
+  updateContactNote: "users.updateContactNote",
+  toggleNoForwards: "users.toggleNoForwards",
+};
+
+if (methodMap[String(fnName)]) {
+  return callApiClient(
+    methodMap[String(fnName)],
+    args[0],
+  ) as EnsurePromise<MethodResponse<T>>;
+}
 
   if (acarthubMethods.has(String(fnName))) {
     const result = await callApiClient(String(fnName), args);
