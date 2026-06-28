@@ -206,9 +206,11 @@ export const messageRoutes = {
     date: now,
 
     content: {
-      type: "text",
-      text: payload.text,
-    },
+  text: {
+    text: payload.text ?? "",
+    entities: [],
+  },
+},
 
     reply_info: null,
     forward_info: null,
