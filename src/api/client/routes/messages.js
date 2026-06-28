@@ -1,5 +1,5 @@
 import { supabase } from "../../../../server/lib/supabase.js";
-import { botSendMessage } from "../../../../api/lib/telegram.js";
+import { botSendMessage } from "../../../../server/lib/telegram.js";
 
 function emptyMessages(extra = {}) {
   return {
