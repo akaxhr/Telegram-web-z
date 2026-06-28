@@ -86,13 +86,13 @@ async function loadMessagesByChat(payload = {}) {
   }));
 
   const users = (userRows ?? []).map((u) => ({
-    id: u.id,
-    firstName: u.first_name ?? "",
-    lastName: u.last_name ?? "",
-    username: u.username ?? undefined,
-    isSelf: false,
-    type: "user",
-  }));
+  id: u.id,
+  firstName: u.first_name ?? "",
+  lastName: u.last_name ?? "",
+  username: u.username ?? undefined,
+  isSelf: u.id === "user-1",
+  type: "user",
+}));
 
   const chats = (chatRows ?? []).map((c) => ({
     id: c.id,
