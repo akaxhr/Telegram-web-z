@@ -1,9 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  "https://zpilbjbvepwurrquwolb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwaWxiamJ2ZXB3dXJycXV3b2xiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MjU4MDAwOCwiZXhwIjoyMDk4MTU2MDA4fQ.hSgInSden9Pu0efS0yhKLdpNaVmMvNfssB6cZtVTg9M"
-);
+import { supabase } from "../../../api/lib/supabase.js";
 
 function emptyMessages(extra = {}) {
   return {

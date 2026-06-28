@@ -1,0 +1,1 @@
+export { routes } from "../../src/api/client/routes/index.js";

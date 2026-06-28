@@ -1,8 +1,8 @@
-import { routes } from "./routes/index.js";
+import { routes } from "../lib/routes.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ ok: false });
+    return res.status(405).end();
   }
 
   try {
@@ -18,9 +18,10 @@ export default async function handler(req, res) {
     }
 
     const result = await fn(payload, options);
-    return res.status(200).json(result);
+
+    return res.json(result);
   } catch (err) {
-    console.error("[API CLIENT ERROR]", err);
+    console.error(err);
 
     return res.status(500).json({
       ok: false,
