@@ -1,5 +1,6 @@
 import { supabase } from "../../../../api/lib/supabase.js";
-
+import { botSendMessage } from "../../../../api/lib/telegram.js";
+await botSendMessage(chatId, payload.text);
 function emptyMessages(extra = {}) {
   return {
     messages: [],
