@@ -1,6 +1,6 @@
 import { supabase } from "../../../../api/lib/supabase.js";
 import { botSendMessage } from "../../../../api/lib/telegram.js";
-await botSendMessage(chatId, payload.text);
+
 function emptyMessages(extra = {}) {
   return {
     messages: [],
@@ -192,6 +192,8 @@ export const messageRoutes = {
 
   async "messages.sendMessage"(payload) {
   const chatId = payload.chat.id;
+  const tg = await botSendMessage(chatId, payload.text);
+       console.log("BOT SEND RESULT:", tg);
 
   // Temporary until auth/bot is connected
   const senderId = "user-1";
