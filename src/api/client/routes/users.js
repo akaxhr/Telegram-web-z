@@ -1,4 +1,4 @@
-import { supabase } from "../../../../api/lib/supabase.js";
+import { supabase } from "../../../../server/lib/supabase.js";
 
 function mapUser(u) {
   return {
