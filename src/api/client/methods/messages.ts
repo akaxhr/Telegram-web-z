@@ -1264,7 +1264,7 @@ export function editChatParticipantRank({
 );
 }
 
-export function deleteScheduledMessages({
+export async function deleteScheduledMessages({
   chat, messageIds,
 }: {
   chat: ApiChat; messageIds: number[];
@@ -1472,6 +1472,7 @@ export async function markMessageListRead({
       maxId,
     },
   );
+}
 } else if (threadId !== MAIN_THREAD_ID) {
   await request(
     "messages.readDiscussion",
@@ -2032,6 +2033,7 @@ if (!result?.webpage) {
 }
 
 return buildWebPage(result.webpage);
+}
 
 export async function sendPollVote({
   chat, messageId, options,
