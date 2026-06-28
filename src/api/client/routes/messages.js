@@ -259,12 +259,13 @@ export const messageRoutes = {
 
   const chatId = chatIdFrom(payload);
   const messageId = payload.messageId ?? payload.id;
-
   const now = Math.floor(Date.now() / 1000);
 
   const content = {
-    type: "text",
-    text: payload.text ?? payload.message ?? "",
+    text: {
+      text: payload.text ?? payload.message ?? "",
+      entities: [],
+    },
   };
 
   const { error } = await supabase
