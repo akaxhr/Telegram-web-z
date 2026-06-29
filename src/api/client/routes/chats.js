@@ -1,14 +1,5 @@
 import { supabase } from "../../../../server/lib/supabase.js";
-import {  botSendMessage,
-  botEditMessage,
-  botDeleteMessage,
-  botPinMessage,
-  botUnpinMessage,
-  botSetChatTitle,
-  botSetChatPhoto,
-  botLeaveChat,
-  botGetChat,
-  botGetChatMember, } from "../../../../server/lib/telegram.js";
+import { telegram } from "../../../../server/lib/telegram.js";
 
 
 
