@@ -176,22 +176,6 @@ import {
 } from '../../selectors/threads';
 import { deleteMessages, updateWithLocalMedia } from '../apiUpdaters/messages';
 
-let chatRefreshInterval: number | undefined;
-
-if (!chatRefreshInterval) {
-  chatRefreshInterval = window.setInterval(() => {
-    const g = getGlobal();
-    const current = selectCurrentMessageList(g);
-
-    if (!current?.chatId) return;
-
-    getActions().loadViewportMessages({
-      chatId: current.chatId,
-      threadId: current.threadId || MAIN_THREAD_ID,
-      forceLastSlice: true,
-    });
-  }, 3000);
-}
 
 const AUTOLOGIN_TOKEN_KEY = 'autologin_token';
 
@@ -1983,19 +1967,22 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
       buildCollectionByKey([result.message], 'id'),
     );
 
-    global = updateListedIds(
-      global,
-      params.chat.id,
-      MAIN_THREAD_ID,
-      [result.message.id],
-    );
+    const existingIds = selectListedIds(global, params.chat.id, MAIN_THREAD_ID) || [];
+const nextIds = unique([...existingIds, result.message.id]).sort((a, b) => a - b);
 
-    global = safeReplaceViewportIds(
-      global,
-      params.chat.id,
-      MAIN_THREAD_ID,
-      [result.message.id],
-    );
+global = updateListedIds(
+  global,
+  params.chat.id,
+  MAIN_THREAD_ID,
+  nextIds,
+);
+
+global = safeReplaceViewportIds(
+  global,
+  params.chat.id,
+  MAIN_THREAD_ID,
+  nextIds,
+);
 
     setGlobal(global);
   }
