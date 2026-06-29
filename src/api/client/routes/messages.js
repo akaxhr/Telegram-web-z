@@ -3,6 +3,10 @@ import { telegram } from "../../../../server/lib/telegram.js";
 
 const BOT_SENDER_ID = "bot";
 
+function makeMessageId(chatId, messageId) {
+  return Number(`${Math.abs(Number(chatId))}${messageId}`);
+}
+
 function nowSec() {
   return Math.floor(Date.now() / 1000);
 }
@@ -401,6 +405,7 @@ async function sendBotMedia(payload = {}) {
 }
 
 export const messageRoutes = {
+  
   async "messages.fetchMessages"(payload) {
     return loadMessagesByChat(payload);
   },
@@ -449,7 +454,7 @@ export const messageRoutes = {
 const { data: inserted, error } = await supabase
   .from("tg_messages")
   .insert({
-    id: Number(`${Date.now()}${String(sent.message_id).padStart(6, "0")}`),
+    id: makeMessageId(chatId, sent.message_id),
     chat_id: chatId,
     sender_id: senderId,
     telegram_message_id: sent.message_id,
@@ -461,9 +466,11 @@ const { data: inserted, error } = await supabase
   .select()
   .single();
 
-  if (error) throw error;
+if (error) throw error;
 
-  return {
+await touchChat(chatId, inserted.id);
+
+return {
   message: {
     id: inserted.id,
     chatId,
@@ -473,7 +480,8 @@ const { data: inserted, error } = await supabase
     isOutgoing: true,
   },
 };
-},
+  },
+  
 
   async "messages.sendMedia"(payload) {
     return sendBotMedia(payload);
