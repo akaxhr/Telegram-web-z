@@ -29,17 +29,16 @@ export const userRoutes = {
     const user = mapUser(data);
 
     return {
-      fullUser: {
-        id: user.id,
-        about: data.about ?? "",
-        profilePhoto: data.profile_photo ?? undefined,
-        personalPhoto: undefined,
-        fallbackPhoto: undefined,
-        botInfo: undefined,
-      },
-      users: [user],
-      chats: [],
-    };
+  user,
+  fullInfo: {
+    bio: data.about ?? "",
+    phoneNumber: data.phone_number ?? undefined,
+    commonChatsCount: 0,
+  },
+  users: [user],
+  chats: [],
+  userStatusesById: {},
+};
   },
 
   async "users.getCommonChats"() {

@@ -1940,6 +1940,7 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
 
 
 async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
+  // @optimization
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
@@ -1956,13 +1957,15 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     setGlobal(global);
   } : undefined;
 
-  await callApi('sendMessage', params, progressCallback);
+  const result = await callApi('sendMessage', params, progressCallback);
 
-  getActions().loadViewportMessages({
-    chatId: params.chat.id,
-    threadId: MAIN_THREAD_ID,
-    forceLastSlice: true,
-  });
+  if (result?.message) {
+    getActions().loadViewportMessages({
+      chatId: params.chat.id,
+      threadId: MAIN_THREAD_ID,
+      forceLastSlice: true,
+    });
+  }
 
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
