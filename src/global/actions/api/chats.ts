@@ -3531,52 +3531,91 @@ addActionHandler('loadDiscussion', async (global, actions, payload): Promise<voi
 
 async function loadChats(
   listType: ChatListType,
-  allAtOnce?: boolean,
-  withPinned?: boolean,
+  isFullDraftSync?: boolean,
+  shouldIgnorePagination?: boolean,
 ) {
   let global = getGlobal();
+  const lastLocalServiceMessageId = selectLastServiceNotification(global)?.id;
 
-  const loadingParams = selectChatListLoadingParameters(global, listType);
-  const result = await callApi('fetchChats', {
-    limit: allAtOnce ? CHAT_LIST_LOAD_SLICE : CHAT_LIST_LOAD_SLICE,
+  const params = !shouldIgnorePagination ? selectChatListLoadingParameters(global, listType) : {};
+  const offsetPeer = params.nextOffsetPeerId ? selectPeer(global, params.nextOffsetPeerId) : undefined;
+  const offsetDate = params.nextOffsetDate;
+  const offsetId = params.nextOffsetId;
+
+  const isFirstBatch = !shouldIgnorePagination && !offsetPeer && !offsetDate && !offsetId;
+  const shouldReplaceStaleState = listType === 'active' && isFirstBatch;
+  const isAccountFreeze = selectIsCurrentUserFrozen(global);
+  const currentUser = selectUser(global, global.currentUserId!)!;
+
+  const result = listType === 'saved' ? await callApi('fetchSavedChats', {
+    parentPeer: currentUser,
+    limit: CHAT_LIST_LOAD_SLICE,
+    offsetDate,
+    offsetId,
+    offsetPeer,
+    withPinned: isFirstBatch && !isAccountFreeze,
+  }) : await callApi('fetchChats', {
+    limit: CHAT_LIST_LOAD_SLICE,
+    offsetDate,
+    offsetId,
+    offsetPeer,
     archived: listType === 'archived',
-    withPinned,
-    offsetId: loadingParams?.nextOffsetId,
-    offsetPeer: loadingParams?.nextOffsetPeerId
-      ? selectChat(global, loadingParams.nextOffsetPeerId)
-      : undefined,
-    offsetDate: loadingParams?.nextOffsetDate,
-    lastLocalServiceMessageId: selectLastServiceNotification(global)?.message.id,
+    withPinned: isFirstBatch && !isAccountFreeze,
+    lastLocalServiceMessageId,
   });
 
-  if (!result) return undefined;
+  if (!result) {
+    return;
+  }
+
+  const { chatIds } = result;
 
   global = getGlobal();
 
-  global = updateChats(global, buildCollectionByKey(result.chats, 'id'));
-  global = updateUsers(global, buildCollectionByKey(result.users, 'id'));
+  const newChats = buildCollectionByKey(result.chats, 'id');
 
-  if (result.userStatusesById) {
-    global = addUserStatuses(global, result.userStatusesById);
+  global = updateUsers(global, buildCollectionByKey(result.users, 'id'));
+  global = updateChats(global, newChats);
+  if (isFirstBatch) {
+    global = replaceChatListIds(global, listType, chatIds);
+  } else {
+    global = addChatListIds(global, listType, chatIds);
   }
 
-  if (result.notifyExceptionById) {
+  if (shouldReplaceStaleState) {
+    global = replaceUserStatuses(global, result.userStatusesById);
+    global = replaceNotifyExceptions(global, result.notifyExceptionById);
+  } else {
+    global = addUserStatuses(global, result.userStatusesById);
     global = addNotifyExceptions(global, result.notifyExceptionById);
   }
 
-  if (result.lastMessageByChatId) {
-    global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
+  global = updateChatListSecondaryInfo(global, listType, result);
+  global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
+
+  if (!shouldIgnorePagination) {
+    global = replaceChatListLoadingParameters(
+      global, listType, result.nextOffsetId, result.nextOffsetPeerId, result.nextOffsetDate,
+    );
   }
 
-  global = replaceChatListIds(global, listType, result.chatIds);
+  if (listType === 'active' || listType === 'archived') {
+    const idsToUpdateDraft = isFullDraftSync ? result.chatIds : Object.keys(result.draftsById);
+    idsToUpdateDraft.forEach((chatId) => {
+      const draft = result.draftsById[chatId];
+      const thread = selectThread(global, chatId, MAIN_THREAD_ID);
 
-  global = replaceChatListLoadingParameters(global, listType, {
-    nextOffsetId: result.nextOffsetId,
-    nextOffsetPeerId: result.nextOffsetPeerId,
-    nextOffsetDate: result.nextOffsetDate,
-  });
+      if (!draft && !thread) return;
 
-  if (!result.nextOffsetId && !result.nextOffsetPeerId && !result.nextOffsetDate) {
+      if (!selectDraft(global, chatId, MAIN_THREAD_ID)?.isLocal) {
+        global = replaceThreadLocalStateParam(
+          global, chatId, MAIN_THREAD_ID, 'draft', draft,
+        );
+      }
+    });
+  }
+
+  if ((chatIds.length === 0 || chatIds.length === result.totalChatCount) && !global.chats.isFullyLoaded[listType]) {
     global = {
       ...global,
       chats: {
@@ -3591,8 +3630,78 @@ async function loadChats(
 
   setGlobal(global);
 
+  return {
+    threadInfos: result.threadInfos,
+    threadReadStatesById: result.threadReadStatesById,
+    messages: result.messages,
+  };
+}
+
+export async function loadFullChat<T extends GlobalState>(
+  global: T, actions: RequiredGlobalActions, chat: ApiChat,
+) {
+  if (selectIsCurrentUserFrozen(global)) return undefined;
+  const result = await callApi('fetchFullChat', chat);
+  if (!result) {
+    return undefined;
+  }
+
+  const {
+    chats, userStatusesById, fullInfo, groupCall, membersCount, isForumAsMessages,
+  } = result;
+
+  global = getGlobal();
+  global = updateChats(global, buildCollectionByKey(chats, 'id'));
+
+  if (userStatusesById) {
+    global = addUserStatuses(global, userStatusesById);
+  }
+
+  if (groupCall) {
+    const existingGroupCall = selectGroupCall(global, groupCall.id!);
+    global = updateGroupCall(
+      global,
+      groupCall.id!,
+      omit(groupCall, ['connectionState', 'isLoaded']),
+      undefined,
+      existingGroupCall ? undefined : groupCall.participantsCount,
+    );
+  }
+
+  if (membersCount !== undefined) {
+    global = updateChat(global, chat.id, { membersCount });
+  }
+  if (chat.isForum) {
+    global = updateChat(global, chat.id, { isForumAsMessages });
+  }
+  global = replaceChatFullInfo(global, chat.id, fullInfo);
+  setGlobal(global);
+
+  const stickerSet = fullInfo.stickerSet;
+  const localSet = stickerSet && selectStickerSet(global, stickerSet);
+  if (stickerSet && !localSet) {
+    actions.loadStickers({
+      stickerSetInfo: {
+        id: stickerSet.id,
+        accessHash: stickerSet.accessHash,
+      },
+    });
+  }
+
+  const emojiSet = fullInfo.emojiSet;
+  const localEmojiSet = emojiSet && selectStickerSet(global, emojiSet);
+  if (emojiSet && !localEmojiSet) {
+    actions.loadStickers({
+      stickerSetInfo: {
+        id: emojiSet.id,
+        accessHash: emojiSet.accessHash,
+      },
+    });
+  }
+
   return result;
 }
+
 export async function migrateChat<T extends GlobalState>(
   global: T, actions: RequiredGlobalActions, chat: ApiChat,
   ...[tabId = getCurrentTabId()]: TabArgs<T>
