@@ -531,21 +531,60 @@ addActionHandler('openSupportChat', async (global, actions, payload): Promise<vo
   }
 });
 
-addActionHandler('loadAllChats', (global): ActionReturnType => {
-  const chatId = '1';
+addActionHandler('loadAllChats', async (global, actions, payload): Promise<void> => {
+  const { whenFirstBatchDone } = payload;
+  const listType = payload.listType;
+  let isCallbackFired = false;
+  let i = 0;
 
-  const chat = {
-    id: chatId,
-    type: 'chatTypePrivate',
-    title: 'Acarthub General',
-    lastMessageId: 1,
-  } as ApiChat;
+  while (!global.chats.isFullyLoaded[listType]) {
+    if (i++ >= INFINITE_LOOP_MARKER) {
+      if (DEBUG) {
+        // eslint-disable-next-line no-console
+        console.error('`actions/loadAllChats`: Infinite loop detected');
+      }
 
-  return addChatListIds(
-    updateChat(global, chatId, chat),
-    'active',
-    [chatId],
-  );
+      return;
+    }
+
+    global = getGlobal();
+
+    if (global.connectionState !== 'connectionStateReady' || global.auth.state !== 'authorizationStateReady') {
+      return;
+    }
+
+    const result = await loadChats(
+      listType,
+      true,
+    );
+
+    const isFirstBatch = !isCallbackFired;
+    if (!isCallbackFired) {
+      await whenFirstBatchDone?.();
+      isCallbackFired = true;
+    }
+    global = getGlobal();
+
+    if (result?.messages) {
+      if (isFirstBatch) {
+        global = replaceMessages(global, result.messages);
+      } else {
+        global = addMessages(global, result.messages);
+      }
+    }
+
+    if (result?.threadInfos) {
+      result.threadInfos.forEach((threadInfo) => {
+        global = updateThreadInfo(global, threadInfo);
+      });
+    }
+
+    if (result?.threadReadStatesById) {
+      global = updateMainThreadReadStates(global, result.threadReadStatesById);
+    }
+    setGlobal(global);
+    global = getGlobal();
+  }
 });
 
 addActionHandler('loadPinnedDialogs', async (global, actions, payload): Promise<void> => {
@@ -3488,8 +3527,112 @@ addActionHandler('loadDiscussion', async (global, actions, payload): Promise<voi
   setGlobal(global);
 });
 
-async function loadChats() {
-  return await callApi('loadAllChats');
+async function loadChats(
+  listType: ChatListType,
+  isFullDraftSync?: boolean,
+  shouldIgnorePagination?: boolean,
+) {
+  let global = getGlobal();
+  const lastLocalServiceMessageId = selectLastServiceNotification(global)?.id;
+
+  const params = !shouldIgnorePagination ? selectChatListLoadingParameters(global, listType) : {};
+  const offsetPeer = params.nextOffsetPeerId ? selectPeer(global, params.nextOffsetPeerId) : undefined;
+  const offsetDate = params.nextOffsetDate;
+  const offsetId = params.nextOffsetId;
+
+  const isFirstBatch = !shouldIgnorePagination && !offsetPeer && !offsetDate && !offsetId;
+  const shouldReplaceStaleState = listType === 'active' && isFirstBatch;
+  const isAccountFreeze = selectIsCurrentUserFrozen(global);
+  const currentUser = selectUser(global, global.currentUserId!)!;
+
+  const result = listType === 'saved' ? await callApi('fetchSavedChats', {
+    parentPeer: currentUser,
+    limit: CHAT_LIST_LOAD_SLICE,
+    offsetDate,
+    offsetId,
+    offsetPeer,
+    withPinned: isFirstBatch && !isAccountFreeze,
+  }) : await callApi('fetchChats', {
+    limit: CHAT_LIST_LOAD_SLICE,
+    offsetDate,
+    offsetId,
+    offsetPeer,
+    archived: listType === 'archived',
+    withPinned: isFirstBatch && !isAccountFreeze,
+    lastLocalServiceMessageId,
+  });
+
+  if (!result) {
+    return;
+  }
+
+  const { chatIds } = result;
+
+  global = getGlobal();
+
+  const newChats = buildCollectionByKey(result.chats, 'id');
+
+  global = updateUsers(global, buildCollectionByKey(result.users, 'id'));
+  global = updateChats(global, newChats);
+  if (isFirstBatch) {
+    global = replaceChatListIds(global, listType, chatIds);
+  } else {
+    global = addChatListIds(global, listType, chatIds);
+  }
+
+  if (shouldReplaceStaleState) {
+    global = replaceUserStatuses(global, result.userStatusesById);
+    global = replaceNotifyExceptions(global, result.notifyExceptionById);
+  } else {
+    global = addUserStatuses(global, result.userStatusesById);
+    global = addNotifyExceptions(global, result.notifyExceptionById);
+  }
+
+  global = updateChatListSecondaryInfo(global, listType, result);
+  global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
+
+  if (!shouldIgnorePagination) {
+    global = replaceChatListLoadingParameters(
+      global, listType, result.nextOffsetId, result.nextOffsetPeerId, result.nextOffsetDate,
+    );
+  }
+
+  if (listType === 'active' || listType === 'archived') {
+    const idsToUpdateDraft = isFullDraftSync ? result.chatIds : Object.keys(result.draftsById);
+    idsToUpdateDraft.forEach((chatId) => {
+      const draft = result.draftsById[chatId];
+      const thread = selectThread(global, chatId, MAIN_THREAD_ID);
+
+      if (!draft && !thread) return;
+
+      if (!selectDraft(global, chatId, MAIN_THREAD_ID)?.isLocal) {
+        global = replaceThreadLocalStateParam(
+          global, chatId, MAIN_THREAD_ID, 'draft', draft,
+        );
+      }
+    });
+  }
+
+  if ((chatIds.length === 0 || chatIds.length === result.totalChatCount) && !global.chats.isFullyLoaded[listType]) {
+    global = {
+      ...global,
+      chats: {
+        ...global.chats,
+        isFullyLoaded: {
+          ...global.chats.isFullyLoaded,
+          [listType]: true,
+        },
+      },
+    };
+  }
+
+  setGlobal(global);
+
+  return {
+    threadInfos: result.threadInfos,
+    threadReadStatesById: result.threadReadStatesById,
+    messages: result.messages,
+  };
 }
 
 export async function loadFullChat<T extends GlobalState>(
