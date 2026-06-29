@@ -21,6 +21,14 @@ export function replaceChatListIds<T extends GlobalState>(
   type: ChatListType,
   newIds: string[] | undefined,
 ): T {
+
+  console.log(
+    "[replaceChatListIds]",
+    type,
+    newIds,
+    global.chats.listIds,
+  );
+
   return {
     ...global,
     chats: {

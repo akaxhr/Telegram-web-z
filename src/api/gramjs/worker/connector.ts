@@ -197,7 +197,7 @@ export async function callApi<T extends keyof Methods>(
   if (acarthubMethods.has(String(fnName))) {
     const result = await callApiClient(String(fnName), args);
     console.log('[ACARTHUB API]', fnName, result);
-    return result as MethodResponse<T>;
+    return result as Awaited<MethodResponse<T>>;
   }
 
   const result = await makeRequest({
