@@ -548,16 +548,7 @@ addActionHandler('loadAllChats', async (global, actions, payload): Promise<void>
     global = getGlobal();
 
     // Acarthub bot mode: login is bypassed, so don't block chat loading on Telegram auth state
-global = {
-  ...global,
-  connectionState: 'connectionStateReady',
-  auth: {
-    ...global.auth,
-    state: 'authorizationStateReady',
-  },
-};
 
-setGlobal(global);
     const result = await loadChats(listType, true);
 
     const isFirstBatch = !isCallbackFired;
