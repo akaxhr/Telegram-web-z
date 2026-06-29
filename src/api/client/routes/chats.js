@@ -185,27 +185,22 @@ export const chatRoutes = {
     };
   },
 
-  async "chats.fetchChats"(payload) {
-  try {
-    return await fetchChats(payload);
-  } catch (err) {
-    console.error("[chats.fetchChats ERROR]", err);
-    return {
-      chatIds: [],
-      chats: [],
-      users: [],
-      userStatusesById: {},
-      draftsById: {},
-      orderedPinnedIds: [],
-      totalChatCount: 0,
-      lastMessageByChatId: {},
-      messages: [],
-      notifyExceptionById: {},
-      threadReadStatesById: {},
-      threadInfos: [],
-      error: String(err?.message || err),
-    };
-  }
+  async "chats.fetchChat"({ userId }) {
+  const chatId = userId;
+  const tgChat = await telegram.getChat({ chat_id: chatId });
+
+  const chat = {
+    id: String(tgChat.id),
+    title: tgChat.title ?? tgChat.first_name ?? tgChat.username ?? "Chat",
+    username: tgChat.username ?? undefined,
+    type: tgChat.type === "private" ? "chatTypePrivate" :
+          tgChat.type === "group" ? "chatTypeBasicGroup" :
+          tgChat.type === "supergroup" ? "chatTypeSuperGroup" :
+          "chatTypeChannel",
+    isListed: true,
+  };
+
+  return { chat, chatId: chat.id };
 },
 
   async "chats.requestChatUpdate"({ chatId }) {
