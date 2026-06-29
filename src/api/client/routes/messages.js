@@ -166,7 +166,8 @@ async function loadMessagesByChat(payload = {}) {
     .select("*")
     .eq("chat_id", chatId)
     .eq("is_deleted", false)
-    .order("date", { ascending: true });
+    .order("date", { ascending: true })
+    .order("id", { ascending: true });
 
   if (offsetId) query = query.lt("id", offsetId);
   if (limit) query = query.limit(limit);
@@ -251,7 +252,8 @@ async function loadMessagesByIds(payload = {}) {
     .eq("chat_id", chatId)
     .eq("is_deleted", false)
     .in("id", messageIds.map(Number))
-    .order("date", { ascending: true });
+    .order("date", { ascending: true })
+    .order("id", { ascending: true });
 
   if (error) throw error;
 
@@ -447,7 +449,7 @@ export const messageRoutes = {
 const { data: inserted, error } = await supabase
   .from("tg_messages")
   .insert({
-    id: Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`),
+    id: Number(`${Date.now()}${String(sent.message_id).padStart(6, "0")}`),
     chat_id: chatId,
     sender_id: senderId,
     telegram_message_id: sent.message_id,
