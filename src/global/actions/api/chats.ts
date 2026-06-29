@@ -3563,11 +3563,13 @@ async function loadChats(
 
   global = replaceChatListIds(global, listType, result.chatIds);
 
-  global = replaceChatListLoadingParameters(global, listType,{
-    nextOffsetId: result.nextOffsetId,
-    nextOffsetPeerId: result.nextOffsetPeerId,
-    nextOffsetDate: result.nextOffsetDate,
-     });
+  global = replaceChatListLoadingParameters(
+  global,
+  listType,
+  result.nextOffsetId,
+  result.nextOffsetPeerId,
+  result.nextOffsetDate,
+);
 
   if (!result.nextOffsetId && !result.nextOffsetPeerId && !result.nextOffsetDate) {
     global = {

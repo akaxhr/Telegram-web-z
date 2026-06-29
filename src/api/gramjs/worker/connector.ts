@@ -180,15 +180,18 @@ export async function callApi<T extends keyof Methods>(
   ...args: MethodArgs<T>
 ): EnsurePromise<MethodResponse<T>> {
   const acarthubMethods = new Set([
-    'loadAllChats',
-    'oldFetchLangPack',
-'fetchLangStrings',
-'fetchLanguage',
-'fetchLangPack',
-    'fetchMessages',
-    'sendMessage',
-    'fetchChat',
-  ]);
+  'fetchChats',
+  'fetchSavedChats',
+  'fetchPinnedDialogs',
+  'fetchChatFolders',
+  'fetchChat',
+  'fetchMessages',
+  'sendMessage',
+  'oldFetchLangPack',
+  'fetchLangStrings',
+  'fetchLanguage',
+  'fetchLangPack',
+]);
   
 
   if (acarthubMethods.has(String(fnName))) {
