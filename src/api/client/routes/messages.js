@@ -1,5 +1,16 @@
 import { supabase } from "../../../../server/lib/supabase.js";
-import { botSendMessage } from "../../../../server/lib/telegram.js";
+import { telegram } from "../../../../server/lib/telegram.js";
+
+async function getTelegramMessageId(chatId, messageId) {
+  const { data } = await supabase
+    .from("tg_messages")
+    .select("telegram_message_id")
+    .eq("chat_id", chatId)
+    .eq("id", messageId)
+    .maybeSingle();
+
+  return data?.telegram_message_id ?? messageId;
+}
 
 function emptyMessages(extra = {}) {
   return {
@@ -185,37 +196,61 @@ export const messageRoutes = {
     return loadMessagesByIds(payload);
   },
 
-  async "messages.sendMedia"(payload, options) {
-    console.log("messages.sendMedia", payload);
-    return ok({ updates: [], message: null });
-  },
+  async "messages.sendMedia"(payload) {
+  const chatId = chatIdFrom(payload);
+  const media = payload.media || payload.file || payload;
+  const caption = payload.caption?.text ?? payload.caption ?? "";
 
-  async "messages.sendMessage"(payload) {
-  const chatId = payload.chat.id;
-  const tg = await botSendMessage(chatId, payload.text);
-       console.log("BOT SEND RESULT:", tg);
+  let tg;
 
-  // Temporary until auth/bot is connected
-  const senderId = "user-1";
+  if (media?.photo) tg = await telegram.sendPhoto({ chat_id: chatId, photo: media.photo, caption });
+  else if (media?.video) tg = await telegram.sendVideo({ chat_id: chatId, video: media.video, caption });
+  else if (media?.document) tg = await telegram.sendDocument({ chat_id: chatId, document: media.document, caption });
+  else if (media?.audio) tg = await telegram.sendAudio({ chat_id: chatId, audio: media.audio, caption });
+  else if (media?.voice) tg = await telegram.sendVoice({ chat_id: chatId, voice: media.voice, caption });
+  else if (media?.animation) tg = await telegram.sendAnimation({ chat_id: chatId, animation: media.animation, caption });
+  else if (media?.sticker) tg = await telegram.sendSticker({ chat_id: chatId, sticker: media.sticker });
+  else return ok({ updates: [], message: null });
 
-  const now = Math.floor(Date.now() / 1000);
-  const id = Date.now();
+  return ok({ updates: [], message: null, raw: tg });
+},
+
+ async "messages.sendMessage"(payload) {
+  console.log("messages.sendMessage", payload);
+
+  const chatId = String(payload?.chat?.id ?? payload?.messageList?.chatId ?? payload?.chatId);
+  const text = payload?.text ?? "";
+
+  if (!chatId || chatId === "undefined") {
+    throw new Error("Missing chatId in sendMessage");
+  }
+
+ tg = chatId !== "1"
+  ? await telegram.sendMessage({ chat_id: chatId, text })
+  : null;
+
+telegramMessageId = tg?.message_id ?? null;
+  
+
+  const id = telegramMessageId
+    ? Number(`${Math.abs(Number(chatId))}${telegramMessageId}`)
+    : Date.now();
 
   const row = {
     id,
     chat_id: chatId,
     sender_id: senderId,
-    telegram_message_id: id,
+    telegram_message_id: telegramMessageId ?? id,
     date: now,
 
     content: {
-  text: {
-    text: payload.text ?? "",
-    entities: [],
-  },
-},
+      text: {
+        text,
+        entities: [],
+      },
+    },
 
-    reply_info: null,
+    reply_info: payload?.replyInfo ?? null,
     forward_info: null,
     reactions: null,
 
@@ -226,13 +261,24 @@ export const messageRoutes = {
     is_outgoing: true,
     is_pinned: false,
     is_deleted: false,
+
+    raw: tg?.result ?? null,
+    updated_at: new Date().toISOString(),
   };
 
   const { error } = await supabase
     .from("tg_messages")
-    .insert(row);
+    .upsert(row);
 
   if (error) throw error;
+
+  await supabase
+    .from("tg_chats")
+    .update({
+      last_message_id: id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", chatId);
 
   return {
     updates: [],
@@ -247,10 +293,21 @@ export const messageRoutes = {
   };
 },
 
-  async "messages.sendMultiMedia"(payload, options) {
-    console.log("messages.sendMultiMedia", payload);
-    return ok({ updates: [], message: null });
-  },
+ async "messages.sendMultiMedia"(payload) {
+  const chatId = chatIdFrom(payload);
+
+  const media = (payload.multiMedia || payload.media || []).map((item) => ({
+    type: item.type || "photo",
+    media: item.fileId || item.media || item.photo || item.video,
+    caption: item.caption?.text ?? item.caption,
+  }));
+
+  if (chatId !== "1" && media.length) {
+    await telegram.sendMediaGroup({ chat_id: chatId, media });
+  }
+
+  return ok({ updates: [], message: null });
+},
 
   async "messages.uploadMedia"(payload, options) {
     console.log("messages.uploadMedia", payload);
@@ -263,7 +320,15 @@ export const messageRoutes = {
   const chatId = chatIdFrom(payload);
   const messageId = payload.messageId ?? payload.id;
   const now = Math.floor(Date.now() / 1000);
+const telegramMessageId = await getTelegramMessageId(chatId, messageId);
 
+if (chatId !== "1") {
+  await telegram.editMessageText({
+    chat_id: chatId,
+    message_id: telegramMessageId,
+    text: content.text.text,
+  });
+}
   const content = {
     text: {
       text: payload.text ?? payload.message ?? "",
@@ -294,11 +359,21 @@ export const messageRoutes = {
   });
 },
 
-  async "messages.editMessageMedia"(payload, options) {
-    console.log("messages.editMessageMedia", payload);
-    return ok();
-  },
+  async "messages.editMessageMedia"(payload) {
+  const chatId = chatIdFrom(payload);
+  const messageId = payload.messageId ?? payload.id;
+  const telegramMessageId = await getTelegramMessageId(chatId, messageId);
 
+  if (chatId !== "1") {
+    await telegram.call("editMessageMedia", {
+      chat_id: chatId,
+      message_id: telegramMessageId,
+      media: payload.media,
+    });
+  }
+
+  return ok();
+},
   async "messages.appendTodoList"(payload, options) {
     console.log("messages.appendTodoList", payload);
     return ok();
@@ -309,20 +384,47 @@ export const messageRoutes = {
     return ok();
   },
 
-  async "messages.updatePinnedMessage"(payload, options) {
-    console.log("messages.updatePinnedMessage", payload);
-    return ok();
-  },
+  async "messages.updatePinnedMessage"(payload) {
+  const chatId = chatIdFrom(payload);
+  const messageId = payload.messageId ?? payload.id;
+  const telegramMessageId = await getTelegramMessageId(chatId, messageId);
 
-  async "messages.unpinAllMessages"(payload, options) {
-    console.log("messages.unpinAllMessages", payload);
-    return affected();
-  },
+  if (payload.isPinned === false || payload.shouldUnpin) {
+    await telegram.unpinChatMessage({ chat_id: chatId, message_id: telegramMessageId });
+  } else {
+    await telegram.pinChatMessage({
+      chat_id: chatId,
+      message_id: telegramMessageId,
+      disable_notification: Boolean(payload.isSilent),
+    });
+  }
 
-  async "messages.deleteMessages"(payload, options) {
-    console.log("messages.deleteMessages", payload);
-    return markMessagesDeleted(payload);
-  },
+  return ok();
+},
+
+  async "messages.unpinAllMessages"(payload) {
+  const chatId = chatIdFrom(payload);
+
+  if (chatId !== "1") {
+    await telegram.unpinAllChatMessages({ chat_id: chatId });
+  }
+
+  return affected();
+},
+
+  async "messages.deleteMessages"(payload) {
+  const chatId = chatIdFrom(payload);
+  const messageIds = payload?.messageIds ?? payload?.ids ?? [];
+
+  if (chatId !== "1") {
+    for (const id of messageIds) {
+      const telegramMessageId = await getTelegramMessageId(chatId, id);
+      await telegram.deleteMessage({ chat_id: chatId, message_id: telegramMessageId });
+    }
+  }
+
+  return markMessagesDeleted({ ...payload, messageIds });
+},
 
   async "channels.deleteParticipantHistory"(payload, options) {
     console.log("channels.deleteParticipantHistory", payload);
@@ -369,10 +471,18 @@ export const messageRoutes = {
     return ok();
   },
 
-  async "messages.setTyping"(payload, options) {
-    console.log("messages.setTyping", payload);
-    return true;
-  },
+  async "messages.setTyping"(payload) {
+  const chatId = chatIdFrom(payload);
+
+  if (chatId !== "1") {
+    await telegram.call("sendChatAction", {
+      chat_id: chatId,
+      action: payload.action || "typing",
+    });
+  }
+
+  return true;
+},
 
   async "channels.readHistory"(payload, options) {
     console.log("channels.readHistory", payload);
@@ -480,10 +590,20 @@ export const messageRoutes = {
     return ok({ updates: [] });
   },
 
-  async "messages.editPoll"(payload, options) {
-    console.log("messages.editPoll", payload);
-    return ok({ updates: [] });
-  },
+  async "messages.editPoll"(payload) {
+  const chatId = chatIdFrom(payload);
+  const messageId = payload.messageId ?? payload.id;
+  const telegramMessageId = await getTelegramMessageId(chatId, messageId);
+
+  if (chatId !== "1") {
+    await telegram.call("stopPoll", {
+      chat_id: chatId,
+      message_id: telegramMessageId,
+    });
+  }
+
+  return ok({ updates: [] });
+},
 
   async "messages.getPollVotes"(payload, options) {
     console.log("messages.getPollVotes", payload);
@@ -499,10 +619,24 @@ export const messageRoutes = {
     return ok({ media: [], users: [], chats: [] });
   },
 
-  async "messages.forwardMessages"(payload, options) {
-    console.log("messages.forwardMessages", payload);
-    return ok({ updates: [], message: null });
-  },
+  async "messages.forwardMessages"(payload) {
+  const toChatId = payload.toChatId ?? payload.chatId ?? payload.toPeer?.id;
+  const fromChatId = payload.fromChatId ?? payload.fromPeer?.id ?? chatIdFrom(payload);
+  const messageIds = payload.messageIds ?? payload.ids ?? [];
+
+  if (toChatId && fromChatId && messageIds.length) {
+    for (const id of messageIds) {
+      const telegramMessageId = await getTelegramMessageId(String(fromChatId), id);
+      await telegram.forwardMessage({
+        chat_id: toChatId,
+        from_chat_id: fromChatId,
+        message_id: telegramMessageId,
+      });
+    }
+  }
+
+  return ok({ updates: [], message: null });
+},
 
   async "messages.getHistory"(payload, options) {
     return loadMessagesByChat(payload);
