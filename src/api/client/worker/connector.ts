@@ -225,14 +225,18 @@ export async function callApi<T extends keyof Methods>(
 };
 
 if (methodMap[String(fnName)]) {
-  return callApiClient(
+  console.log('[METHOD MAP]', fnName, args);
+
+  const payload = args[0] ?? {};
+
+  return await callApiClient(
     methodMap[String(fnName)],
-    args[0],
-  ) as EnsurePromise<MethodResponse<T>>;
+    payload,
+  ) as unknown as Awaited<MethodResponse<T>>;
 }
 
   if (acarthubMethods.has(String(fnName))) {
-    const result = await callApiClient(String(fnName), args);
+    const result = await callApiClient(String(fnName), args[0]);
     console.log('[ACARTHUB API]', fnName, result);
     return result as MethodResponse<T>;
   }
