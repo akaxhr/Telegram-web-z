@@ -120,7 +120,6 @@ type ChatListData = {
   nextOffsetPeerId?: string;
   nextOffsetDate?: number;
 };
-
 export async function fetchChats({
   limit,
   offsetDate,
@@ -138,126 +137,37 @@ export async function fetchChats({
   withPinned?: boolean;
   lastLocalServiceMessageId?: number;
 }): Promise<ChatListData | undefined> {
-  const peer = (offsetPeer && buildInputPeer(offsetPeer.id, offsetPeer.accessHash)) || new GramJs.InputPeerEmpty();
- const result = await request("chats.fetchChats", {
-  limit,
-  offsetDate,
-  offsetPeer,
-  offsetId,
-  archived,
-  withPinned,
-});
-
-const resultPinned = undefined;
-
-if (!result) {
-  return undefined;
-}
-
-  const messages = (resultPinned ? resultPinned.messages : [])
-    .concat(result.messages)
-    .map(buildApiMessage)
-    .filter(Boolean);
-
-  const peersByKey = preparePeers(result);
-  if (resultPinned) {
-    Object.assign(peersByKey, preparePeers(resultPinned, peersByKey));
-  }
-
-  const chats: ApiChat[] = [];
-  const draftsById: Record<string, ApiDraft> = {};
-  const notifyExceptionById: Record<string, ApiPeerNotifySettings> = {};
-  const threadReadStatesById: Record<string, ThreadReadState> = {};
-  const threadInfos: ApiThreadInfo[] = [];
-
-  const dialogs = (resultPinned?.dialogs || []).concat(result.dialogs);
-
-const orderedPinnedIds: string[] = [];
-const lastMessageByChatId: Record<string, number> = {};
-
-dialogs.forEach((dialog) => {
-  if (
-    !(dialog instanceof GramJs.Dialog)
-    || (!archived && dialog.folderId === ARCHIVED_FOLDER_ID)
-    || (archived && dialog.folderId !== ARCHIVED_FOLDER_ID)
-  ) {
-    return;
-  }
-  
-    const peerEntity = peersByKey[getPeerKey(dialog.peer)];
-    const chat = buildApiChatFromDialog(dialog, peerEntity);
-    lastMessageByChatId[chat.id] = dialog.topMessage;
-
-    const isChannel = getEntityTypeById(chat.id) === 'channel';
-    if (dialog.pts && isChannel) {
-      updateChannelState(chat.id, dialog.pts);
-    }
-
-    if (
-      chat.id === SERVICE_NOTIFICATIONS_USER_ID
-      && lastLocalServiceMessageId
-      && (lastLocalServiceMessageId > dialog.topMessage)
-    ) {
-      lastMessageByChatId[chat.id] = lastLocalServiceMessageId;
-    }
-
-    chat.isListed = true;
-
-    chats.push(chat);
-
-    const notifySettings = buildApiPeerNotifySettings(dialog.notifySettings);
-    if (Object.values(omitUndefined(notifySettings)).length) {
-      notifyExceptionById[chat.id] = notifySettings;
-
-      if (notifySettings.mutedUntil) {
-        scheduleMutedChatUpdate(chat.id, notifySettings.mutedUntil, sendApiUpdate);
-      }
-    }
-
-    if (withPinned && dialog.pinned) {
-      orderedPinnedIds.push(chat.id);
-    }
-
-    if (dialog.draft) {
-      const draft = buildMessageDraft(dialog.draft);
-      if (draft) {
-        draftsById[chat.id] = draft;
-      }
-    }
-
-    const readState = buildThreadReadState(dialog);
-    threadReadStatesById[chat.id] = readState;
-
-    const threadInfo = buildApiThreadInfoFromDialog(chat.id, dialog);
-    threadInfos.push(threadInfo);
+  const result = await request<ChatListData>("chats.fetchChats", {
+    limit,
+    offsetDate,
+    offsetPeer,
+    offsetId,
+    archived,
+    withPinned,
+    lastLocalServiceMessageId,
   });
-const chatIds = chats.map((chat) => chat.id);
 
-const users = result.users ?? [];
-const userStatusesById = result.userStatusesById ?? {};
-const totalChatCount = result.totalChatCount ?? chatIds.length;
+  if (!result) {
+    return undefined;
+  }
 
-const nextOffsetId = result.nextOffsetId;
-const nextOffsetPeerId = result.nextOffsetPeerId;
-const nextOffsetDate = result.nextOffsetDate;
-
-return {
-  chatIds,
-  chats,
-  users,
-  userStatusesById,
-  draftsById,
-  orderedPinnedIds: withPinned ? orderedPinnedIds : undefined,
-  totalChatCount,
-  lastMessageByChatId,
-  messages,
-  notifyExceptionById,
-  nextOffsetId,
-  nextOffsetPeerId,
-  nextOffsetDate,
-  threadReadStatesById,
-  threadInfos,
-};
+  return {
+    chatIds: result.chatIds ?? [],
+    chats: result.chats ?? [],
+    users: result.users ?? [],
+    userStatusesById: result.userStatusesById ?? {},
+    draftsById: result.draftsById ?? {},
+    threadReadStatesById: result.threadReadStatesById ?? {},
+    threadInfos: result.threadInfos ?? [],
+    orderedPinnedIds: withPinned ? result.orderedPinnedIds : undefined,
+    totalChatCount: result.totalChatCount ?? result.chats?.length ?? 0,
+    messages: result.messages ?? [],
+    notifyExceptionById: result.notifyExceptionById ?? {},
+    lastMessageByChatId: result.lastMessageByChatId ?? {},
+    nextOffsetId: result.nextOffsetId,
+    nextOffsetPeerId: result.nextOffsetPeerId,
+    nextOffsetDate: result.nextOffsetDate,
+  };
 }
 
 export async function fetchSavedChats({
@@ -275,48 +185,36 @@ export async function fetchSavedChats({
   offsetId?: number;
   withPinned?: boolean;
 }): Promise<ChatListData | undefined> {
+  const result = await request<ChatListData>("chats.fetchSavedChats", {
+    parentPeer,
+    offsetPeer,
+    offsetId,
+    offsetDate,
+    limit,
+    withPinned,
+  });
 
-  const result = await request("chats.fetchSavedChats", {
-  parentPeer,
-  offsetPeer,
-  offsetId,
-  offsetDate,
-  limit,
-  withPinned,
-});
+  if (!result) {
+    return undefined;
+  }
 
-const resultPinned = undefined;
-
-if (!result) {
-  return undefined;
-}
-
-  const chatIds = result.chatIds ?? result.chats?.map((chat: ApiChat) => chat.id) ?? [];
-const chats = result.chats ?? [];
-const users = result.users ?? [];
-const userStatusesById = result.userStatusesById ?? {};
-const orderedPinnedIds = result.orderedPinnedIds ?? [];
-const totalChatCount = result.totalChatCount ?? chatIds.length;
-const lastMessageByChatId = result.lastMessageByChatId ?? {};
-const messages = result.messages ?? [];
-const threadInfos = result.threadInfos ?? [];
-
-return {
-  chatIds,
-  chats,
-  users,
-  userStatusesById,
-  orderedPinnedIds: withPinned ? orderedPinnedIds : undefined,
-  totalChatCount,
-  lastMessageByChatId,
-  messages,
-  draftsById: result.draftsById ?? {},
-  notifyExceptionById: result.notifyExceptionById ?? {},
-  nextOffsetId: result.nextOffsetId,
-  nextOffsetPeerId: result.nextOffsetPeerId,
-  nextOffsetDate: result.nextOffsetDate,
-  threadInfos,
-};
+  return {
+    chatIds: result.chatIds ?? [],
+    chats: result.chats ?? [],
+    users: result.users ?? [],
+    userStatusesById: result.userStatusesById ?? {},
+    draftsById: result.draftsById ?? {},
+    threadReadStatesById: result.threadReadStatesById ?? {},
+    threadInfos: result.threadInfos ?? [],
+    orderedPinnedIds: withPinned ? result.orderedPinnedIds : undefined,
+    totalChatCount: result.totalChatCount ?? result.chats?.length ?? 0,
+    messages: result.messages ?? [],
+    notifyExceptionById: result.notifyExceptionById ?? {},
+    lastMessageByChatId: result.lastMessageByChatId ?? {},
+    nextOffsetId: result.nextOffsetId,
+    nextOffsetPeerId: result.nextOffsetPeerId,
+    nextOffsetDate: result.nextOffsetDate,
+  };
 }
 
 const fullChatRequestDedupe = new Map<string, Promise<FullChatData | undefined>>();
