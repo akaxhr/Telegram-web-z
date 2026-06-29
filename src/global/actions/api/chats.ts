@@ -525,7 +525,7 @@ addActionHandler('openSupportChat', async (global, actions, payload): Promise<vo
 
   actions.openChat({ id: TMP_CHAT_ID, shouldReplaceHistory: true, tabId });
 
-  const result = await callApi('fetchChat', { type: 'support' });
+ const result = await callApi('fetchChat', { type: 'support' });
   if (result) {
     actions.openChat({ id: result.chatId, shouldReplaceHistory: true, tabId });
   }
@@ -548,14 +548,16 @@ addActionHandler('loadAllChats', async (global, actions, payload): Promise<void>
     global = getGlobal();
 
     // Acarthub bot mode: login is bypassed, so don't block chat loading on Telegram auth state
-if (global.connectionState !== 'connectionStateReady') {
-  global = {
-    ...global,
-    connectionState: 'connectionStateReady',
-  };
-  setGlobal(global);
-}
+global = {
+  ...global,
+  connectionState: 'connectionStateReady',
+  auth: {
+    ...global.auth,
+    state: 'authorizationStateReady',
+  },
+};
 
+setGlobal(global);
     const result = await loadChats(listType, true);
 
     const isFirstBatch = !isCallbackFired;
@@ -3570,11 +3572,11 @@ async function loadChats(
 
   global = replaceChatListIds(global, listType, result.chatIds);
 
-  global = replaceChatListLoadingParameters(global, listType, {
+  global = replaceChatListLoadingParameters(global, listType,{
     nextOffsetId: result.nextOffsetId,
     nextOffsetPeerId: result.nextOffsetPeerId,
     nextOffsetDate: result.nextOffsetDate,
-  });
+     });
 
   if (!result.nextOffsetId && !result.nextOffsetPeerId && !result.nextOffsetDate) {
     global = {
