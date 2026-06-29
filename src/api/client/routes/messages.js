@@ -1,15 +1,48 @@
 import { supabase } from "../../../../server/lib/supabase.js";
 import { telegram } from "../../../../server/lib/telegram.js";
 
-async function getTelegramMessageId(chatId, messageId) {
-  const { data } = await supabase
-    .from("tg_messages")
-    .select("telegram_message_id")
-    .eq("chat_id", chatId)
-    .eq("id", messageId)
-    .maybeSingle();
+const BOT_SENDER_ID = "bot";
 
-  return data?.telegram_message_id ?? messageId;
+function nowSec() {
+  return Math.floor(Date.now() / 1000);
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function chatIdFrom(payload = {}) {
+  const value =
+    payload?.chatId ??
+    payload?.toChatId ??
+    payload?.fromChatId ??
+    payload?.chat?.id ??
+    payload?.peerId ??
+    payload?.peer?.id ??
+    payload?.messageList?.chatId ??
+    "1";
+
+  return String(value);
+}
+
+function senderIdFrom(payload = {}, chatId) {
+  return String(
+    payload?.senderId ??
+    payload?.localMessage?.senderId ??
+    payload?.message?.senderId ??
+    payload?.fromId ??
+    BOT_SENDER_ID ??
+    chatId,
+  );
+}
+
+function makeMessageId(chatId, telegramMessageId) {
+  if (telegramMessageId) {
+    const safeChat = String(chatId).replace(/[^0-9]/g, "") || "1";
+    return Number(`${safeChat}${telegramMessageId}`);
+  }
+
+  return Date.now();
 }
 
 function emptyMessages(extra = {}) {
@@ -19,6 +52,7 @@ function emptyMessages(extra = {}) {
     users: [],
     topics: [],
     count: 0,
+    totalCount: 0,
     ...extra,
   };
 }
@@ -39,25 +73,105 @@ function ok(extra = {}) {
   };
 }
 
-function chatIdFrom(payload = {}) {
-  return String(
-    payload?.chat?.id
-    ?? payload?.peer?.id
-    ?? payload?.chatId
-    ?? "1"
-  );
+function normalizeContent(rowOrPayload = {}) {
+  if (rowOrPayload?.content) return rowOrPayload.content;
+
+  const text =
+    rowOrPayload?.text?.text ??
+    rowOrPayload?.text ??
+    rowOrPayload?.message?.content?.text?.text ??
+    rowOrPayload?.localMessage?.content?.text?.text ??
+    rowOrPayload?.caption?.text ??
+    rowOrPayload?.caption ??
+    "";
+
+  return {
+    text: {
+      text: String(text ?? ""),
+      entities: rowOrPayload?.entities ?? [],
+    },
+  };
+}
+
+function normalizeMessageRow(m) {
+  if (!m) return undefined;
+
+  return {
+    id: Number(m.id),
+    chatId: String(m.chat_id ?? m.chatId),
+    senderId: String(m.sender_id ?? m.senderId ?? BOT_SENDER_ID),
+    date: Number(m.date ?? nowSec()),
+    content: m.content ?? normalizeContent(m),
+    replyInfo: m.reply_info ?? m.replyInfo ?? undefined,
+    forwardInfo: m.forward_info ?? m.forwardInfo ?? undefined,
+    reactions: m.reactions ?? undefined,
+    groupedId: m.grouped_id ?? m.groupedId ?? undefined,
+    sendingState: m.sending_state ?? m.sendingState ?? undefined,
+    editDate: m.edit_date ?? m.editDate ?? undefined,
+    isOutgoing: Boolean(m.is_outgoing ?? m.isOutgoing),
+    isPinned: Boolean(m.is_pinned ?? m.isPinned),
+  };
+}
+
+function normalizeUserRow(u) {
+  if (!u) return undefined;
+
+  return {
+    id: String(u.id),
+    type: "user",
+    firstName: u.first_name ?? u.firstName ?? "",
+    lastName: u.last_name ?? u.lastName ?? "",
+    username: u.username ?? undefined,
+    isSelf: Boolean(u.is_self ?? u.isSelf),
+  };
+}
+
+function normalizeChatRow(c) {
+  if (!c) return undefined;
+
+  return {
+    id: String(c.id),
+    title: c.title ?? "Chat",
+    type: c.type ?? "chatTypePrivate",
+    accessHash: c.access_hash ?? c.accessHash ?? "0",
+    isListed: true,
+    isPinned: Boolean(c.is_pinned ?? c.isPinned),
+    isMuted: Boolean(c.is_muted ?? c.isMuted),
+    isArchived: Boolean(c.is_archived ?? c.isArchived),
+    isForum: Boolean(c.is_forum ?? c.isForum),
+    withForumTabs: Boolean(c.with_forum_tabs ?? c.withForumTabs),
+  };
+}
+
+async function getTelegramMessageId(chatId, messageId) {
+  const { data, error } = await supabase
+    .from("tg_messages")
+    .select("telegram_message_id")
+    .eq("chat_id", String(chatId))
+    .eq("id", Number(messageId))
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return data?.telegram_message_id ?? messageId;
 }
 
 async function loadMessagesByChat(payload = {}) {
   const chatId = chatIdFrom(payload);
+  const limit = Number(payload.limit ?? 50);
+  const offsetId = payload.offsetId ? Number(payload.offsetId) : undefined;
 
-  const { data: messageRows, error: msgError } = await supabase
+  let query = supabase
     .from("tg_messages")
     .select("*")
     .eq("chat_id", chatId)
     .eq("is_deleted", false)
     .order("date", { ascending: true });
 
+  if (offsetId) query = query.lt("id", offsetId);
+  if (limit) query = query.limit(limit);
+
+  const { data: messageRows, error: msgError } = await query;
   if (msgError) throw msgError;
 
   const senderIds = [
@@ -65,6 +179,7 @@ async function loadMessagesByChat(payload = {}) {
       (messageRows ?? [])
         .map((m) => m.sender_id)
         .filter(Boolean)
+        .map(String),
     ),
   ];
 
@@ -81,36 +196,9 @@ async function loadMessagesByChat(payload = {}) {
 
   if (chatError) throw chatError;
 
-  const messages = (messageRows ?? []).map((m) => ({
-    id: m.id,
-    chatId: m.chat_id,
-    senderId: m.sender_id,
-    date: m.date,
-    content: m.content,
-    replyInfo: m.reply_info,
-    forwardInfo: m.forward_info,
-    reactions: m.reactions,
-    groupedId: m.grouped_id,
-    sendingState: m.sending_state,
-    editDate: m.edit_date,
-    isOutgoing: m.is_outgoing,
-    isPinned: m.is_pinned,
-  }));
-
-  const users = (userRows ?? []).map((u) => ({
-  id: u.id,
-  firstName: u.first_name ?? "",
-  lastName: u.last_name ?? "",
-  username: u.username ?? undefined,
-  isSelf: u.id === "user-1",
-  type: "user",
-}));
-
-  const chats = (chatRows ?? []).map((c) => ({
-    id: c.id,
-    title: c.title ?? "Chat",
-    type: c.type ?? "group",
-  }));
+  const messages = (messageRows ?? []).map(normalizeMessageRow).filter(Boolean);
+  const users = (userRows ?? []).map(normalizeUserRow).filter(Boolean);
+  const chats = (chatRows ?? []).map(normalizeChatRow).filter(Boolean);
 
   return {
     messages,
@@ -118,60 +206,89 @@ async function loadMessagesByChat(payload = {}) {
     users,
     topics: [],
     count: messages.length,
+    totalCount: messages.length,
   };
 }
 
 async function loadOneMessage(payload = {}) {
-  const { messageId } = payload;
+  const messageId = payload.messageId ?? payload.id;
   const chatId = chatIdFrom(payload);
+
+  if (!messageId) return { message: undefined, ...emptyMessages() };
 
   const { data, error } = await supabase
     .from("tg_messages")
     .select("*")
     .eq("chat_id", chatId)
-    .eq("id", messageId)
+    .eq("id", Number(messageId))
+    .eq("is_deleted", false)
     .maybeSingle();
 
   if (error) throw error;
 
-  return emptyMessages({
-    messages: data ? [data] : [],
-    count: data ? 1 : 0,
-  });
+  const message = data ? normalizeMessageRow(data) : undefined;
+
+  return {
+    message,
+    messages: message ? [message] : [],
+    chats: [],
+    users: [],
+    topics: [],
+    count: message ? 1 : 0,
+    totalCount: message ? 1 : 0,
+  };
 }
 
 async function loadMessagesByIds(payload = {}) {
-  const { messageIds = [] } = payload;
+  const messageIds = payload.messageIds ?? payload.ids ?? [];
   const chatId = chatIdFrom(payload);
 
-  if (!messageIds.length) {
-    return emptyMessages();
-  }
+  if (!messageIds.length) return emptyMessages();
 
   const { data, error } = await supabase
     .from("tg_messages")
     .select("*")
     .eq("chat_id", chatId)
-    .in("id", messageIds)
+    .eq("is_deleted", false)
+    .in("id", messageIds.map(Number))
     .order("date", { ascending: true });
 
   if (error) throw error;
 
+  const messages = (data ?? []).map(normalizeMessageRow).filter(Boolean);
+
   return emptyMessages({
-    messages: data ?? [],
-    count: data?.length ?? 0,
+    messages,
+    count: messages.length,
+    totalCount: messages.length,
   });
 }
 
+async function upsertMessageRow(row) {
+  const { error } = await supabase.from("tg_messages").upsert(row);
+  if (error) throw error;
+}
+
+async function touchChat(chatId, lastMessageId) {
+  await supabase
+    .from("tg_chats")
+    .update({
+      last_message_id: lastMessageId,
+      updated_at: nowIso(),
+    })
+    .eq("id", String(chatId));
+}
+
 async function markMessagesDeleted(payload = {}) {
-  const { messageIds = [] } = payload;
+  const chatId = chatIdFrom(payload);
+  const messageIds = payload.messageIds ?? payload.ids ?? [];
 
   if (messageIds.length) {
     const { error } = await supabase
       .from("tg_messages")
-      .update({ is_deleted: true, updated_at: new Date().toISOString() })
-      .eq("chat_id", chatIdFrom(payload))
-      .in("id", messageIds);
+      .update({ is_deleted: true, updated_at: nowIso() })
+      .eq("chat_id", chatId)
+      .in("id", messageIds.map(Number));
 
     if (error) throw error;
   }
@@ -179,676 +296,448 @@ async function markMessagesDeleted(payload = {}) {
   return affected({ affectedMessages: messageIds });
 }
 
-export const messageRoutes = {
-  async "messages.fetchMessages"(payload, options) {
-    return loadMessagesByChat(payload);
-  },
-
-  async "messages.fetchMessage"(payload, options) {
-    return loadOneMessage(payload);
-  },
-
-  async "messages.fetchRichMessage"(payload, options) {
-    return loadOneMessage(payload);
-  },
-
-  async "messages.fetchMessagesByIds"(payload, options) {
-    return loadMessagesByIds(payload);
-  },
-
-  async "messages.sendMedia"(payload) {
+async function sendBotText(payload = {}) {
   const chatId = chatIdFrom(payload);
-  const media = payload.media || payload.file || payload;
-  const caption = payload.caption?.text ?? payload.caption ?? "";
-
-  let tg;
-
-  if (media?.photo) tg = await telegram.sendPhoto({ chat_id: chatId, photo: media.photo, caption });
-  else if (media?.video) tg = await telegram.sendVideo({ chat_id: chatId, video: media.video, caption });
-  else if (media?.document) tg = await telegram.sendDocument({ chat_id: chatId, document: media.document, caption });
-  else if (media?.audio) tg = await telegram.sendAudio({ chat_id: chatId, audio: media.audio, caption });
-  else if (media?.voice) tg = await telegram.sendVoice({ chat_id: chatId, voice: media.voice, caption });
-  else if (media?.animation) tg = await telegram.sendAnimation({ chat_id: chatId, animation: media.animation, caption });
-  else if (media?.sticker) tg = await telegram.sendSticker({ chat_id: chatId, sticker: media.sticker });
-  else return ok({ updates: [], message: null });
-
-  return ok({ updates: [], message: null, raw: tg });
-},
-
- async "messages.sendMessage"(payload) {
-  console.log("messages.sendMessage", payload);
-
-  const chatId = String(payload?.chat?.id ?? payload?.messageList?.chatId ?? payload?.chatId);
-  const text = payload?.text ?? "";
+  const text = String(
+    payload?.text ??
+    payload?.localMessage?.content?.text?.text ??
+    payload?.message?.content?.text?.text ??
+    "",
+  );
 
   if (!chatId || chatId === "undefined") {
-    throw new Error("Missing chatId in sendMessage");
+    throw new Error("Missing chatId in messages.sendMessage");
   }
 
- tg = chatId !== "1"
-  ? await telegram.sendMessage({ chat_id: chatId, text })
-  : null;
+  let tg = null;
+  if (chatId !== "1") {
+    tg = await telegram.sendMessage({ chat_id: chatId, text });
+  }
 
-telegramMessageId = tg?.message_id ?? null;
-  
-
-  const id = telegramMessageId
-    ? Number(`${Math.abs(Number(chatId))}${telegramMessageId}`)
-    : Date.now();
+  const telegramMessageId = tg?.message_id ?? tg?.result?.message_id ?? null;
+  const id = makeMessageId(chatId, telegramMessageId);
+  const date = nowSec();
+  const senderId = senderIdFrom(payload, chatId);
+  const content = normalizeContent({ text, entities: payload.entities ?? [] });
 
   const row = {
     id,
     chat_id: chatId,
     sender_id: senderId,
     telegram_message_id: telegramMessageId ?? id,
-    date: now,
-
-    content: {
-      text: {
-        text,
-        entities: [],
-      },
-    },
-
+    date,
+    content,
     reply_info: payload?.replyInfo ?? null,
     forward_info: null,
     reactions: null,
-
     grouped_id: null,
     sending_state: null,
     edit_date: null,
-
     is_outgoing: true,
     is_pinned: false,
     is_deleted: false,
-
-    raw: tg?.result ?? null,
-    updated_at: new Date().toISOString(),
+    raw: tg?.result ?? tg ?? null,
+    updated_at: nowIso(),
   };
 
-  const { error } = await supabase
-    .from("tg_messages")
-    .upsert(row);
+  await upsertMessageRow(row);
+  await touchChat(chatId, id);
 
-  if (error) throw error;
-
-  await supabase
-    .from("tg_chats")
-    .update({
-      last_message_id: id,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", chatId);
-
-  return {
+  return ok({
     updates: [],
-    message: {
-      id,
-      chatId,
-      senderId,
-      date: now,
-      content: row.content,
-      isOutgoing: true,
-    },
-  };
-},
+    message: normalizeMessageRow(row),
+  });
+}
 
- async "messages.sendMultiMedia"(payload) {
+async function sendBotMedia(payload = {}) {
   const chatId = chatIdFrom(payload);
+  const media = payload.media || payload.file || payload;
+  const caption = payload.caption?.text ?? payload.caption ?? payload.text ?? "";
 
-  const media = (payload.multiMedia || payload.media || []).map((item) => ({
-    type: item.type || "photo",
-    media: item.fileId || item.media || item.photo || item.video,
-    caption: item.caption?.text ?? item.caption,
-  }));
+  let tg = null;
 
-  if (chatId !== "1" && media.length) {
-    await telegram.sendMediaGroup({ chat_id: chatId, media });
+  if (chatId !== "1") {
+    if (media?.photo) tg = await telegram.sendPhoto({ chat_id: chatId, photo: media.photo, caption });
+    else if (media?.video) tg = await telegram.sendVideo({ chat_id: chatId, video: media.video, caption });
+    else if (media?.document) tg = await telegram.sendDocument({ chat_id: chatId, document: media.document, caption });
+    else if (media?.audio) tg = await telegram.sendAudio({ chat_id: chatId, audio: media.audio, caption });
+    else if (media?.voice) tg = await telegram.sendVoice({ chat_id: chatId, voice: media.voice, caption });
+    else if (media?.animation) tg = await telegram.sendAnimation({ chat_id: chatId, animation: media.animation, caption });
+    else if (media?.sticker) tg = await telegram.sendSticker({ chat_id: chatId, sticker: media.sticker });
   }
 
-  return ok({ updates: [], message: null });
-},
+  const telegramMessageId = tg?.message_id ?? tg?.result?.message_id ?? null;
+  const id = makeMessageId(chatId, telegramMessageId);
+  const date = nowSec();
+  const senderId = senderIdFrom(payload, chatId);
+  const content = normalizeContent({ text: caption, entities: payload.entities ?? [] });
 
-  async "messages.uploadMedia"(payload, options) {
+  const row = {
+    id,
+    chat_id: chatId,
+    sender_id: senderId,
+    telegram_message_id: telegramMessageId ?? id,
+    date,
+    content,
+    reply_info: payload?.replyInfo ?? null,
+    forward_info: null,
+    reactions: null,
+    grouped_id: null,
+    sending_state: null,
+    edit_date: null,
+    is_outgoing: true,
+    is_pinned: false,
+    is_deleted: false,
+    raw: tg?.result ?? tg ?? null,
+    updated_at: nowIso(),
+  };
+
+  await upsertMessageRow(row);
+  await touchChat(chatId, id);
+
+  return ok({ updates: [], message: normalizeMessageRow(row), raw: tg });
+}
+
+export const messageRoutes = {
+  async "messages.fetchMessages"(payload) {
+    return loadMessagesByChat(payload);
+  },
+
+  async "messages.fetchMessage"(payload) {
+    return loadOneMessage(payload);
+  },
+
+  async "messages.fetchRichMessage"(payload) {
+    return loadOneMessage(payload);
+  },
+
+  async "messages.fetchMessagesByIds"(payload) {
+    return loadMessagesByIds(payload);
+  },
+
+  async "messages.getHistory"(payload) {
+    return loadMessagesByChat(payload);
+  },
+
+  async "messages.sendMessage"(payload) {
+    return sendBotText(payload);
+  },
+
+  async "messages.sendMedia"(payload) {
+    return sendBotMedia(payload);
+  },
+
+  async "messages.sendMultiMedia"(payload) {
+    const chatId = chatIdFrom(payload);
+    const mediaItems = Object.values(payload.singleMediaByIndex ?? payload.multiMedia ?? payload.media ?? []);
+
+    if (chatId !== "1" && mediaItems.length) {
+      const media = mediaItems.map((item) => ({
+        type: item.type || "photo",
+        media: item.fileId || item.media || item.photo || item.video,
+        caption: item.caption?.text ?? item.caption ?? item.message ?? "",
+      }));
+
+      await telegram.sendMediaGroup({ chat_id: chatId, media });
+    }
+
+    return ok({ updates: [], messages: [], message: null });
+  },
+
+  async "messages.uploadMedia"(payload) {
     console.log("messages.uploadMedia", payload);
     return {};
   },
 
   async "messages.editMessage"(payload) {
-  console.log("messages.editMessage", payload);
+    const chatId = chatIdFrom(payload);
+    const messageId = payload.messageId ?? payload.id ?? payload.message?.id;
+    const text = String(payload.text ?? payload.message?.content?.text?.text ?? "");
+    const content = normalizeContent({ text, entities: payload.entities ?? [] });
+    const editDate = nowSec();
+    const telegramMessageId = await getTelegramMessageId(chatId, messageId);
 
-  const chatId = chatIdFrom(payload);
-  const messageId = payload.messageId ?? payload.id;
-  const now = Math.floor(Date.now() / 1000);
-const telegramMessageId = await getTelegramMessageId(chatId, messageId);
+    if (chatId !== "1") {
+      await telegram.editMessageText({
+        chat_id: chatId,
+        message_id: telegramMessageId,
+        text,
+      });
+    }
 
-if (chatId !== "1") {
-  await telegram.editMessageText({
-    chat_id: chatId,
-    message_id: telegramMessageId,
-    text: content.text.text,
-  });
-}
-  const content = {
-    text: {
-      text: payload.text ?? payload.message ?? "",
-      entities: [],
-    },
-  };
+    const { error } = await supabase
+      .from("tg_messages")
+      .update({ content, edit_date: editDate, updated_at: nowIso() })
+      .eq("chat_id", chatId)
+      .eq("id", Number(messageId));
 
-  const { error } = await supabase
-    .from("tg_messages")
-    .update({
-      content,
-      edit_date: now,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("chat_id", chatId)
-    .eq("id", messageId);
+    if (error) throw error;
 
-  if (error) throw error;
-
-  return ok({
-    updates: [],
-    message: {
-      id: messageId,
-      chatId,
-      content,
-      editDate: now,
-    },
-  });
-},
-
-  async "messages.editMessageMedia"(payload) {
-  const chatId = chatIdFrom(payload);
-  const messageId = payload.messageId ?? payload.id;
-  const telegramMessageId = await getTelegramMessageId(chatId, messageId);
-
-  if (chatId !== "1") {
-    await telegram.call("editMessageMedia", {
-      chat_id: chatId,
-      message_id: telegramMessageId,
-      media: payload.media,
+    return ok({
+      updates: [],
+      message: {
+        id: Number(messageId),
+        chatId,
+        content,
+        editDate,
+      },
     });
-  }
-
-  return ok();
-},
-  async "messages.appendTodoList"(payload, options) {
-    console.log("messages.appendTodoList", payload);
-    return ok();
   },
 
-  async "messages.editScheduledMessage"(payload, options) {
-    console.log("messages.editScheduledMessage", payload);
+  async "messages.editMessageMedia"(payload) {
+    const chatId = chatIdFrom(payload);
+    const messageId = payload.messageId ?? payload.id ?? payload.message?.id;
+    const telegramMessageId = await getTelegramMessageId(chatId, messageId);
+
+    if (chatId !== "1") {
+      await telegram.call("editMessageMedia", {
+        chat_id: chatId,
+        message_id: telegramMessageId,
+        media: payload.media,
+      });
+    }
+
     return ok();
   },
 
   async "messages.updatePinnedMessage"(payload) {
-  const chatId = chatIdFrom(payload);
-  const messageId = payload.messageId ?? payload.id;
-  const telegramMessageId = await getTelegramMessageId(chatId, messageId);
+    const chatId = chatIdFrom(payload);
+    const messageId = payload.messageId ?? payload.id;
+    const telegramMessageId = await getTelegramMessageId(chatId, messageId);
 
-  if (payload.isPinned === false || payload.shouldUnpin) {
-    await telegram.unpinChatMessage({ chat_id: chatId, message_id: telegramMessageId });
-  } else {
-    await telegram.pinChatMessage({
-      chat_id: chatId,
-      message_id: telegramMessageId,
-      disable_notification: Boolean(payload.isSilent),
-    });
-  }
+    if (chatId !== "1") {
+      if (payload.isUnpin || payload.isPinned === false || payload.shouldUnpin) {
+        await telegram.unpinChatMessage({ chat_id: chatId, message_id: telegramMessageId });
+      } else {
+        await telegram.pinChatMessage({
+          chat_id: chatId,
+          message_id: telegramMessageId,
+          disable_notification: Boolean(payload.isSilent),
+        });
+      }
+    }
 
-  return ok();
-},
+    return ok();
+  },
 
   async "messages.unpinAllMessages"(payload) {
-  const chatId = chatIdFrom(payload);
-
-  if (chatId !== "1") {
-    await telegram.unpinAllChatMessages({ chat_id: chatId });
-  }
-
-  return affected();
-},
+    const chatId = chatIdFrom(payload);
+    if (chatId !== "1") await telegram.unpinAllChatMessages({ chat_id: chatId });
+    return affected();
+  },
 
   async "messages.deleteMessages"(payload) {
-  const chatId = chatIdFrom(payload);
-  const messageIds = payload?.messageIds ?? payload?.ids ?? [];
+    const chatId = chatIdFrom(payload);
+    const messageIds = payload.messageIds ?? payload.ids ?? [];
 
-  if (chatId !== "1") {
-    for (const id of messageIds) {
-      const telegramMessageId = await getTelegramMessageId(chatId, id);
-      await telegram.deleteMessage({ chat_id: chatId, message_id: telegramMessageId });
+    if (chatId !== "1") {
+      for (const id of messageIds) {
+        const telegramMessageId = await getTelegramMessageId(chatId, id);
+        await telegram.deleteMessage({ chat_id: chatId, message_id: telegramMessageId });
+      }
     }
-  }
 
-  return markMessagesDeleted({ ...payload, messageIds });
-},
-
-  async "channels.deleteParticipantHistory"(payload, options) {
-    console.log("channels.deleteParticipantHistory", payload);
-    return affected();
-  },
-
-  async "messages.editChatParticipantRank"(payload, options) {
-    console.log("messages.editChatParticipantRank", payload);
-    return true;
-  },
-
-  async "messages.deleteScheduledMessages"(payload, options) {
-    console.log("messages.deleteScheduledMessages", payload);
-    return ok();
-  },
-
-  async "channels.deleteHistory"(payload, options) {
-    console.log("channels.deleteHistory", payload);
-    return affected();
-  },
-
-  async "messages.deleteHistory"(payload, options) {
-    console.log("messages.deleteHistory", payload);
-    return affected();
-  },
-
-  async "messages.deleteSavedHistory"(payload, options) {
-    console.log("messages.deleteSavedHistory", payload);
-    return affected();
-  },
-
-  async "messages.toggleSuggestedPostApproval"(payload, options) {
-    console.log("messages.toggleSuggestedPostApproval", payload);
-    return ok();
-  },
-
-  async "messages.report"(payload, options) {
-    console.log("messages.report", payload);
-    return {};
-  },
-
-  async "channels.reportSpam"(payload, options) {
-    console.log("channels.reportSpam", payload);
-    return ok();
+    return markMessagesDeleted({ ...payload, messageIds });
   },
 
   async "messages.setTyping"(payload) {
-  const chatId = chatIdFrom(payload);
-
-  if (chatId !== "1") {
-    await telegram.call("sendChatAction", {
-      chat_id: chatId,
-      action: payload.action || "typing",
-    });
-  }
-
-  return true;
-},
-
-  async "channels.readHistory"(payload, options) {
-    console.log("channels.readHistory", payload);
-    return affected();
-  },
-
-  async "messages.readDiscussion"(payload, options) {
-    console.log("messages.readDiscussion", payload);
-    return affected();
-  },
-
-  async "messages.readHistory"(payload, options) {
-    console.log("messages.readHistory", payload);
-    return affected();
-  },
-
-  async "channels.readMessageContents"(payload, options) {
-    console.log("channels.readMessageContents", payload);
-    return affected();
-  },
-
-  async "messages.readMessageContents"(payload, options) {
-    console.log("messages.readMessageContents", payload);
-    return affected();
-  },
-
-  async "messages.getMessagesViews"(payload, options) {
-    const ids = payload?.messageIds ?? payload?.ids ?? [];
-
-    return {
-      views: ids.map(() => ({
-        views: 0,
-        forwards: 0,
-        replies: undefined,
-      })),
-    };
-  },
-
-  async "messages.getFactCheck"(payload, options) {
-    console.log("messages.getFactCheck", payload);
-    return [];
-  },
-
-  async "messages.getPaidReactionPrivacy"(payload, options) {
+    const chatId = chatIdFrom(payload);
+    if (chatId !== "1") {
+      await telegram.call("sendChatAction", {
+        chat_id: chatId,
+        action: payload.action || "typing",
+      });
+    }
     return true;
   },
 
-  async "messages.reportMessagesDelivery"(payload, options) {
-    console.log("messages.reportMessagesDelivery", payload);
-    return ok();
+  async "messages.forwardMessages"(payload) {
+    const toChatId = String(payload.toChatId ?? payload.chatId ?? payload.toChat?.id ?? "");
+    const fromChatId = String(payload.fromChatId ?? payload.fromChat?.id ?? chatIdFrom(payload));
+    const messageIds = payload.messageIds ?? payload.ids ?? [];
+
+    if (toChatId && fromChatId && messageIds.length) {
+      for (const id of messageIds) {
+        const telegramMessageId = await getTelegramMessageId(fromChatId, id);
+        await telegram.forwardMessage({
+          chat_id: toChatId,
+          from_chat_id: fromChatId,
+          message_id: telegramMessageId,
+        });
+      }
+    }
+
+    return ok({ updates: [], messages: [], message: null });
   },
 
-  async "messages.getDiscussionMessage"(payload, options) {
-    console.log("messages.getDiscussionMessage", payload);
+  async "messages.getMessagesViews"(payload) {
+    const ids = payload.messageIds ?? payload.ids ?? [];
+    return {
+      views: ids.map(() => ({ views: 0, forwards: 0, replies: undefined })),
+    };
+  },
+
+  async "messages.getPollVotes"() {
+    return { count: 0, votes: [], nextOffset: undefined };
+  },
+
+  async "channels.getSendAs"() {
+    return { peers: [], chats: [], users: [] };
+  },
+
+  async "messages.getQuickReplies"() {
+    return { quickReplies: [], messages: [], chats: [], users: [] };
+  },
+
+  async "messages.getQuickReplyMessages"() {
+    return emptyMessages();
+  },
+
+  async "messages.getUnreadMentions"() {
+    return emptyMessages();
+  },
+
+  async "messages.getUnreadReactions"() {
+    return emptyMessages();
+  },
+
+  async "messages.getUnreadPollVotes"() {
+    return emptyMessages();
+  },
+
+  async "messages.getDiscussionMessage"() {
     return emptyMessages({ maxId: 0 });
   },
 
-  async "messages.search"(payload, options) {
-    console.log("messages.search", payload);
+  async "messages.search"() {
     return emptyMessages();
   },
 
-  async "messages.searchGlobal"(payload, options) {
-    console.log("messages.searchGlobal", payload);
+  async "messages.searchGlobal"() {
     return emptyMessages({ nextRate: 0 });
   },
 
-  async "channels.searchPosts"(payload, options) {
-    console.log("channels.searchPosts", payload);
+  async "channels.searchPosts"() {
     return emptyMessages({ nextRate: 0 });
   },
 
-  async "channels.checkSearchPostsFlood"(payload, options) {
-    console.log("channels.checkSearchPostsFlood", payload);
-    return {
-      starsAmount: 0,
-      floodWait: 0,
-    };
+  async "channels.checkSearchPostsFlood"() {
+    return { starsAmount: 0, floodWait: 0 };
   },
 
-  async "messages.getWebPagePreview"(payload, options) {
-    console.log("messages.getWebPagePreview", payload);
-    return null;
+  async "messages.getWebPagePreview"() {
+    return undefined;
   },
 
-  async "messages.getWebPage"(payload, options) {
-    console.log("messages.getWebPage", payload);
-    return {
-      webpage: undefined,
-    };
+  async "messages.getWebPage"() {
+    return { webpage: undefined };
   },
 
-  async "messages.sendVote"(payload, options) {
-    console.log("messages.sendVote", payload);
-    return ok({ updates: [] });
+  async "messages.transcribeAudio"() {
+    return { pending: false, transcriptionId: "0", text: "" };
   },
 
-  async "messages.addPollAnswer"(payload, options) {
-    console.log("messages.addPollAnswer", payload);
-    return ok({ updates: [] });
+  async "messages.translateText"() {
+    return { result: [], translations: [] };
   },
 
-  async "messages.toggleTodoCompleted"(payload, options) {
-    console.log("messages.toggleTodoCompleted", payload);
-    return ok({ updates: [] });
+  async "messages.summarizeText"() {
+    return { text: "", entities: [] };
   },
 
-  async "messages.editPoll"(payload) {
-  const chatId = chatIdFrom(payload);
-  const messageId = payload.messageId ?? payload.id;
-  const telegramMessageId = await getTelegramMessageId(chatId, messageId);
-
-  if (chatId !== "1") {
-    await telegram.call("stopPoll", {
-      chat_id: chatId,
-      message_id: telegramMessageId,
-    });
-  }
-
-  return ok({ updates: [] });
-},
-
-  async "messages.getPollVotes"(payload, options) {
-    console.log("messages.getPollVotes", payload);
-    return {
-      count: 0,
-      votes: [],
-      nextOffset: undefined,
-    };
+  async "messages.getOutboxReadDate"() {
+    return { date: 0 };
   },
 
-  async "messages.getExtendedMedia"(payload, options) {
-    console.log("messages.getExtendedMedia", payload);
-    return ok({ media: [], users: [], chats: [] });
-  },
-
-  async "messages.forwardMessages"(payload) {
-  const toChatId = payload.toChatId ?? payload.chatId ?? payload.toPeer?.id;
-  const fromChatId = payload.fromChatId ?? payload.fromPeer?.id ?? chatIdFrom(payload);
-  const messageIds = payload.messageIds ?? payload.ids ?? [];
-
-  if (toChatId && fromChatId && messageIds.length) {
-    for (const id of messageIds) {
-      const telegramMessageId = await getTelegramMessageId(String(fromChatId), id);
-      await telegram.forwardMessage({
-        chat_id: toChatId,
-        from_chat_id: fromChatId,
-        message_id: telegramMessageId,
-      });
-    }
-  }
-
-  return ok({ updates: [], message: null });
-},
-
-  async "messages.getHistory"(payload, options) {
-    return loadMessagesByChat(payload);
-  },
-
-  async "messages.getScheduledHistory"(payload, options) {
-    console.log("messages.getScheduledHistory", payload);
-    return emptyMessages();
-  },
-
-  async "messages.sendScheduledMessages"(payload, options) {
-    console.log("messages.sendScheduledMessages", payload);
-    return ok({ updates: [] });
-  },
-
-  async "messages.searchPinned"(payload, options) {
-    console.log("messages.searchPinned", payload);
-    return emptyMessages();
-  },
-
-  async "messages.getMessageReadParticipants"(payload, options) {
-    console.log("messages.getMessageReadParticipants", payload);
+  async "messages.getMessageReadParticipants"() {
     return [];
   },
 
-  async "channels.getSendAs"(payload, options) {
-    console.log("channels.getSendAs", payload);
-    return {
-      peers: [],
-      chats: [],
-      users: [],
-    };
+  async "messages.getSponsoredMessages"() {
+    return { messages: [], chats: [], users: [] };
   },
 
-  async "messages.saveDefaultSendAs"(payload, options) {
-    console.log("messages.saveDefaultSendAs", payload);
+  async "channels.exportMessageLink"() {
+    return { link: "", html: "" };
+  },
+
+  async "messages.getPreparedInlineMessage"() {
+    return { message: null, users: [], chats: [] };
+  },
+
+  async "messages.composeMessageWithAI"() {
+    return { text: "", entities: [] };
+  },
+
+  async "aicompose.getTones"() {
+    return { hash: 0, tones: [] };
+  },
+
+  async "aicompose.createTone"(payload) {
+    return { tone: payload };
+  },
+
+  async "aicompose.updateTone"(payload) {
+    return { tone: payload };
+  },
+
+  async "aicompose.getTone"() {
+    return { tones: [] };
+  },
+
+  async "aicompose.getToneExample"() {
+    return { text: "", entities: [] };
+  },
+
+  async "aicompose.deleteTone"() {
     return ok();
   },
 
-  async "messages.getSponsoredMessages"(payload, options) {
-    console.log("messages.getSponsoredMessages", payload);
-    return {
-      messages: [],
-      chats: [],
-      users: [],
-    };
-  },
-
-  async "messages.viewSponsoredMessage"(payload, options) {
-    console.log("messages.viewSponsoredMessage", payload);
+  async "aicompose.saveTone"() {
     return ok();
   },
 
-  async "messages.clickSponsoredMessage"(payload, options) {
-    console.log("messages.clickSponsoredMessage", payload);
-    return ok();
+  async "messages.appendTodoList"() { return ok(); },
+  async "messages.editScheduledMessage"() { return ok(); },
+  async "messages.deleteScheduledMessages"() { return ok(); },
+  async "channels.deleteParticipantHistory"() { return affected(); },
+  async "messages.editChatParticipantRank"() { return true; },
+  async "channels.deleteHistory"() { return affected(); },
+  async "messages.deleteHistory"() { return affected(); },
+  async "messages.deleteSavedHistory"() { return affected(); },
+  async "messages.toggleSuggestedPostApproval"() { return ok(); },
+  async "messages.report"() { return {}; },
+  async "channels.reportSpam"() { return ok(); },
+  async "channels.readHistory"() { return affected(); },
+  async "messages.readDiscussion"() { return affected(); },
+  async "messages.readHistory"() { return affected(); },
+  async "channels.readMessageContents"() { return affected(); },
+  async "messages.readMessageContents"() { return affected(); },
+  async "messages.getFactCheck"() { return []; },
+  async "messages.getPaidReactionPrivacy"() { return true; },
+  async "messages.reportMessagesDelivery"() { return ok(); },
+  async "messages.sendVote"() { return ok({ updates: [] }); },
+  async "messages.addPollAnswer"() { return ok({ updates: [] }); },
+  async "messages.toggleTodoCompleted"() { return ok({ updates: [] }); },
+  async "messages.editPoll"(payload) {
+    const chatId = chatIdFrom(payload);
+    const messageId = payload.messageId ?? payload.id;
+    const telegramMessageId = await getTelegramMessageId(chatId, messageId);
+    if (chatId !== "1") {
+      await telegram.call("stopPoll", { chat_id: chatId, message_id: telegramMessageId });
+    }
+    return ok({ updates: [] });
   },
-
-  async "messages.reportSponsoredMessage"(payload, options) {
-    console.log("messages.reportSponsoredMessage", payload);
-    return {};
-  },
-
-  async "messages.readMentions"(payload, options) {
-    console.log("messages.readMentions", payload);
-    return affected();
-  },
-
-  async "messages.readReactions"(payload, options) {
-    console.log("messages.readReactions", payload);
-    return affected();
-  },
-
-  async "messages.readPollVotes"(payload, options) {
-    console.log("messages.readPollVotes", payload);
-    return affected();
-  },
-
-  async "messages.getUnreadMentions"(payload, options) {
-    console.log("messages.getUnreadMentions", payload);
-    return emptyMessages();
-  },
-
-  async "messages.getUnreadReactions"(payload, options) {
-    console.log("messages.getUnreadReactions", payload);
-    return emptyMessages();
-  },
-
-  async "messages.getUnreadPollVotes"(payload, options) {
-    console.log("messages.getUnreadPollVotes", payload);
-    return emptyMessages();
-  },
-
-  async "messages.transcribeAudio"(payload, options) {
-    console.log("messages.transcribeAudio", payload);
-    return {
-      pending: false,
-      transcriptionId: "0",
-      text: "",
-    };
-  },
-
-  async "messages.translateText"(payload, options) {
-    console.log("messages.translateText", payload);
-    return {
-      result: [],
-    };
-  },
-
-  async "messages.summarizeText"(payload, options) {
-    console.log("messages.summarizeText", payload);
-    return {
-      text: "",
-      entities: [],
-    };
-  },
-
-  async "messages.getOutboxReadDate"(payload, options) {
-    console.log("messages.getOutboxReadDate", payload);
-    return {
-      date: 0,
-    };
-  },
-
-  async "messages.getQuickReplies"(payload, options) {
-    return {
-      quickReplies: [],
-      messages: [],
-      chats: [],
-      users: [],
-    };
-  },
-
-  async "messages.getQuickReplyMessages"(payload, options) {
-    console.log("messages.getQuickReplyMessages", payload);
-    return emptyMessages();
-  },
-
-  async "messages.sendQuickReplyMessages"(payload, options) {
-    console.log("messages.sendQuickReplyMessages", payload);
-    return ok({ updates: [], message: null });
-  },
-
-  async "channels.exportMessageLink"(payload, options) {
-    console.log("channels.exportMessageLink", payload);
-    return {
-      link: "",
-      html: "",
-    };
-  },
-
-  async "messages.getPreparedInlineMessage"(payload, options) {
-    console.log("messages.getPreparedInlineMessage", payload);
-    return {
-      message: null,
-      users: [],
-      chats: [],
-    };
-  },
-
-  async "messages.composeMessageWithAI"(payload, options) {
-    console.log("messages.composeMessageWithAI", payload);
-    return {
-      text: "",
-      entities: [],
-    };
-  },
-
-  async "aicompose.getTones"(payload, options) {
-    console.log("aicompose.getTones", payload);
-    return {
-      hash: 0,
-      tones: [],
-    };
-  },
-
-  async "aicompose.createTone"(payload, options) {
-    console.log("aicompose.createTone", payload);
-    return {
-      tone: payload,
-    };
-  },
-
-  async "aicompose.deleteTone"(payload, options) {
-    console.log("aicompose.deleteTone", payload);
-    return ok();
-  },
-
-  async "aicompose.updateTone"(payload, options) {
-    console.log("aicompose.updateTone", payload);
-    return {
-      tone: payload,
-    };
-  },
-
-  async "aicompose.getTone"(payload, options) {
-    console.log("aicompose.getTone", payload);
-    return {
-      tone: null,
-    };
-  },
-
-  async "aicompose.getToneExample"(payload, options) {
-    console.log("aicompose.getToneExample", payload);
-    return {
-      text: "",
-      entities: [],
-    };
-  },
-
-  async "aicompose.saveTone"(payload, options) {
-    console.log("aicompose.saveTone", payload);
-    return ok();
-  },
+  async "messages.getExtendedMedia"() { return ok({ media: [], users: [], chats: [] }); },
+  async "messages.getScheduledHistory"() { return emptyMessages(); },
+  async "messages.sendScheduledMessages"() { return ok({ updates: [] }); },
+  async "messages.searchPinned"() { return emptyMessages(); },
+  async "messages.saveDefaultSendAs"() { return ok(); },
+  async "messages.viewSponsoredMessage"() { return ok(); },
+  async "messages.clickSponsoredMessage"() { return ok(); },
+  async "messages.reportSponsoredMessage"() { return {}; },
+  async "messages.readMentions"() { return affected(); },
+  async "messages.readReactions"() { return affected(); },
+  async "messages.readPollVotes"() { return affected(); },
+  async "messages.sendQuickReplyMessages"() { return ok({ updates: [], message: null }); },
 };
