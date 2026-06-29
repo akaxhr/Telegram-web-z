@@ -431,9 +431,9 @@ const { isMasterTab } = tabState;
     return;
   }
 
-  if (connectionState === 'connectionStateReady' && auth.state === 'authorizationStateReady') {
-    getActions().sync();
-  }
+  if (connectionState === 'connectionStateReady') {
+  getActions().sync();
+}
 
   previousGlobal = global;
 });
