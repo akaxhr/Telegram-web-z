@@ -420,8 +420,53 @@ export const messageRoutes = {
   },
 
   async "messages.sendMessage"(payload) {
-    return sendBotText(payload);
-  },
+  const chatId = String(payload.chat?.id || payload.chatId);
+  const text = payload.text || payload.message || "";
+
+  const sent = await telegram.sendMessage({
+    chat_id: chatId,
+    text,
+  });
+
+  const senderId = String(sent.from?.id || process.env.BOT_ID || "bot");
+
+  await supabase.from("tg_users").upsert({
+    id: senderId,
+    first_name: sent.from?.first_name || "Acarthub",
+    username: sent.from?.username || "acarthub_bot",
+    is_bot: true,
+  }, { onConflict: "id" });
+
+  const { data: inserted, error } = await supabase
+    .from("tg_messages")
+    .insert({
+      chat_id: chatId,
+      sender_id: senderId,
+      text,
+      date: sent.date || Math.floor(Date.now() / 1000),
+      is_outgoing: true,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    message: {
+      id: inserted.id,
+      chatId,
+      senderId,
+      date: inserted.date,
+      content: {
+        text: {
+          text,
+          entities: [],
+        },
+      },
+      isOutgoing: true,
+    },
+  };
+},
 
   async "messages.sendMedia"(payload) {
     return sendBotMedia(payload);
