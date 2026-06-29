@@ -186,7 +186,19 @@ addActionHandler('loadViewportMessages', async (global, actions, payload): Promi
   const chatId = payload?.chatId ?? selectCurrentMessageList(global, tabId)?.chatId ?? '1';
   const threadId = payload?.threadId ?? MAIN_THREAD_ID;
 
-  const result = await callApi('fetchMessages');
+  const chat = selectChat(global, chatId);
+
+if (!chat) return;
+
+const result = await callApi('fetchMessages', {
+  chat,
+  chatId: chat.id,
+  threadId,
+  offsetId: undefined,
+  addOffset: undefined,
+  limit: MESSAGE_LIST_SLICE,
+  isSavedDialog: false,
+});
 
   if (!result) return;
 
