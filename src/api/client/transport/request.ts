@@ -4,13 +4,18 @@ type RequestOptions = {
   shouldIgnoreErrors?: boolean;
 };
 
+const API_URL =
+  typeof window !== "undefined"
+    ? "/api/client/request"
+    : `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/client/request`;
+
 export async function request<T = any>(
   method: string,
   payload?: unknown,
   options: RequestOptions = {},
 ): Promise<T | undefined> {
   try {
-    const response = await fetch("http://localhost:3001/api/client/request", {
+    const response = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -18,7 +23,7 @@ export async function request<T = any>(
       body: JSON.stringify({
         method,
         payload,
-        options, // <-- send options too
+        options,
       }),
     });
 
@@ -26,7 +31,7 @@ export async function request<T = any>(
 
     if (!response.ok) {
       if (options.shouldThrow) {
-        throw new Error(result?.error ?? `Request failed: ${response.status}`);
+        throw new Error(result?.error ?? `Request failed (${response.status})`);
       }
 
       if (!options.shouldIgnoreErrors) {
