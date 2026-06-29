@@ -2,24 +2,43 @@ import { supabase } from "../../../../server/lib/supabase.js";
 import { telegram } from "../../../../server/lib/telegram.js";
 
 
+function mapChatType(type) {
+  if (type === "private" || type === "chatTypePrivate") return "chatTypePrivate";
+  if (type === "group" || type === "chatTypeBasicGroup") return "chatTypeBasicGroup";
+  if (type === "supergroup" || type === "chatTypeSuperGroup") return "chatTypeSuperGroup";
+  if (type === "channel" || type === "chatTypeChannel") return "chatTypeChannel";
+
+  return "chatTypeBasicGroup";
+}
 
 function mapChat(c) {
   return {
     id: String(c.id),
-    title: c.title ?? "Chat",
-    type: c.type ?? "chatTypePrivate",
-    username: c.username ?? undefined,
-    photo: c.photo ?? undefined,
-    lastMessageId: c.last_message_id ?? undefined,
+    type: mapChatType(c.type),
+    title: c.title ?? c.username ?? "Chat",
+
+    folderId: c.folder_id ?? undefined,
+    accessHash: c.access_hash ?? "0",
 
     isListed: true,
-    isPinned: Boolean(c.is_pinned),
-    isMuted: Boolean(c.is_muted),
-    isArchived: Boolean(c.folder_id),
+    isNotJoined: false,
+    isMin: false,
+
+    isProtected: Boolean(c.is_protected),
     isForum: Boolean(c.is_forum),
     withForumTabs: Boolean(c.with_forum_tabs),
 
-    accessHash: c.access_hash ?? undefined,
+    isJoinToSend: Boolean(c.join_to_send),
+    isJoinRequest: Boolean(c.join_request),
+
+    membersCount: c.members_count ?? undefined,
+    paidMessagesStars: c.paid_messages_stars ?? undefined,
+
+    usernames: c.username
+      ? [{ username: c.username, isActive: true, isEditable: false }]
+      : undefined,
+
+    hasUsername: Boolean(c.username),
   };
 }
 
