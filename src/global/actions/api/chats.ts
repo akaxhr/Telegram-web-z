@@ -3529,75 +3529,70 @@ addActionHandler('loadDiscussion', async (global, actions, payload): Promise<voi
   setGlobal(global);
 });
 
-async function loadChats() {
-  return await callApi('loadAllChats');
-}
-
-export async function loadFullChat<T extends GlobalState>(
-  global: T, actions: RequiredGlobalActions, chat: ApiChat,
+async function loadChats(
+  listType: ChatListType,
+  allAtOnce?: boolean,
+  withPinned?: boolean,
 ) {
-  if (selectIsCurrentUserFrozen(global)) return undefined;
-  const result = await callApi('fetchFullChat', chat);
-  if (!result) {
-    return undefined;
-  }
+  let global = getGlobal();
 
-  const {
-    chats, userStatusesById, fullInfo, groupCall, membersCount, isForumAsMessages,
-  } = result;
+  const loadingParams = selectChatListLoadingParameters(global, listType);
+  const result = await callApi('fetchChats', {
+    limit: allAtOnce ? CHAT_LIST_LOAD_SLICE : CHAT_LIST_LOAD_SLICE,
+    archived: listType === 'archived',
+    withPinned,
+    offsetId: loadingParams?.nextOffsetId,
+    offsetPeer: loadingParams?.nextOffsetPeerId
+      ? selectChat(global, loadingParams.nextOffsetPeerId)
+      : undefined,
+    offsetDate: loadingParams?.nextOffsetDate,
+    lastLocalServiceMessageId: selectLastServiceNotification(global)?.message.id,
+  });
+
+  if (!result) return undefined;
 
   global = getGlobal();
-  global = updateChats(global, buildCollectionByKey(chats, 'id'));
 
-  if (userStatusesById) {
-    global = addUserStatuses(global, userStatusesById);
-  }
+  global = updateChats(global, buildCollectionByKey(result.chats, 'id'));
+  global = updateUsers(global, buildCollectionByKey(result.users, 'id'));
 
-  if (groupCall) {
-    const existingGroupCall = selectGroupCall(global, groupCall.id!);
-    global = updateGroupCall(
-      global,
-      groupCall.id!,
-      omit(groupCall, ['connectionState', 'isLoaded']),
-      undefined,
-      existingGroupCall ? undefined : groupCall.participantsCount,
-    );
+  if (result.userStatusesById) {
+    global = addUserStatuses(global, result.userStatusesById);
   }
 
-  if (membersCount !== undefined) {
-    global = updateChat(global, chat.id, { membersCount });
+  if (result.notifyExceptionById) {
+    global = addNotifyExceptions(global, result.notifyExceptionById);
   }
-  if (chat.isForum) {
-    global = updateChat(global, chat.id, { isForumAsMessages });
+
+  if (result.lastMessageByChatId) {
+    global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
   }
-  global = replaceChatFullInfo(global, chat.id, fullInfo);
+
+  global = replaceChatListIds(global, listType, result.chatIds);
+
+  global = replaceChatListLoadingParameters(global, listType, {
+    nextOffsetId: result.nextOffsetId,
+    nextOffsetPeerId: result.nextOffsetPeerId,
+    nextOffsetDate: result.nextOffsetDate,
+  });
+
+  if (!result.nextOffsetId && !result.nextOffsetPeerId && !result.nextOffsetDate) {
+    global = {
+      ...global,
+      chats: {
+        ...global.chats,
+        isFullyLoaded: {
+          ...global.chats.isFullyLoaded,
+          [listType]: true,
+        },
+      },
+    };
+  }
+
   setGlobal(global);
-
-  const stickerSet = fullInfo.stickerSet;
-  const localSet = stickerSet && selectStickerSet(global, stickerSet);
-  if (stickerSet && !localSet) {
-    actions.loadStickers({
-      stickerSetInfo: {
-        id: stickerSet.id,
-        accessHash: stickerSet.accessHash,
-      },
-    });
-  }
-
-  const emojiSet = fullInfo.emojiSet;
-  const localEmojiSet = emojiSet && selectStickerSet(global, emojiSet);
-  if (emojiSet && !localEmojiSet) {
-    actions.loadStickers({
-      stickerSetInfo: {
-        id: emojiSet.id,
-        accessHash: emojiSet.accessHash,
-      },
-    });
-  }
 
   return result;
 }
-
 export async function migrateChat<T extends GlobalState>(
   global: T, actions: RequiredGlobalActions, chat: ApiChat,
   ...[tabId = getCurrentTabId()]: TabArgs<T>
