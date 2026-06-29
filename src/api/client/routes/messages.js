@@ -40,14 +40,6 @@ function senderIdFrom(payload = {}, chatId) {
   );
 }
 
-function makeMessageId(chatId, telegramMessageId) {
-  if (telegramMessageId) {
-    const safeChat = String(chatId).replace(/[^0-9]/g, "") || "1";
-    return Number(`${safeChat}${telegramMessageId}`);
-  }
-
-  return Date.now();
-}
 
 function emptyMessages(extra = {}) {
   return {
