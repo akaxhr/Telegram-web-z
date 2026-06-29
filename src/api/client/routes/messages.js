@@ -437,35 +437,40 @@ export const messageRoutes = {
     is_bot: true,
   }, { onConflict: "id" });
 
-  const { data: inserted, error } = await supabase
-    .from("tg_messages")
-    .insert({
-      chat_id: chatId,
-      sender_id: senderId,
-      text,
-      date: sent.date || Math.floor(Date.now() / 1000),
-      is_outgoing: true,
-    })
-    .select()
-    .single();
+  const apiContent = {
+  text: {
+    text,
+    entities: [],
+  },
+};
+
+const { data: inserted, error } = await supabase
+  .from("tg_messages")
+  .insert({
+    id: Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`),
+    chat_id: chatId,
+    sender_id: senderId,
+    telegram_message_id: sent.message_id,
+    date: sent.date || Math.floor(Date.now() / 1000),
+    is_outgoing: true,
+    content: apiContent,
+    raw: sent,
+  })
+  .select()
+  .single();
 
   if (error) throw error;
 
   return {
-    message: {
-      id: inserted.id,
-      chatId,
-      senderId,
-      date: inserted.date,
-      content: {
-        text: {
-          text,
-          entities: [],
-        },
-      },
-      isOutgoing: true,
-    },
-  };
+  message: {
+    id: inserted.id,
+    chatId,
+    senderId,
+    date: inserted.date,
+    content: inserted.content,
+    isOutgoing: true,
+  },
+};
 },
 
   async "messages.sendMedia"(payload) {

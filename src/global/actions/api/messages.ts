@@ -175,6 +175,24 @@ import {
   selectThreadReadState,
 } from '../../selectors/threads';
 import { deleteMessages, updateWithLocalMedia } from '../apiUpdaters/messages';
+
+let chatRefreshInterval: number | undefined;
+
+if (!chatRefreshInterval) {
+  chatRefreshInterval = window.setInterval(() => {
+    const g = getGlobal();
+    const current = selectCurrentMessageList(g);
+
+    if (!current?.chatId) return;
+
+    getActions().loadViewportMessages({
+      chatId: current.chatId,
+      threadId: current.threadId || MAIN_THREAD_ID,
+      forceLastSlice: true,
+    });
+  }, 3000);
+}
+
 const AUTOLOGIN_TOKEN_KEY = 'autologin_token';
 
 const uploadProgressCallbacks = new Map<MessageKey, ApiOnProgress>();
