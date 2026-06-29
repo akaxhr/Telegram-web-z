@@ -3561,11 +3561,13 @@ async function loadChats(
     global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
   }
 
-  global = replaceChatListIds(global, listType, result.chatIds);
+  const targetListType = listType === 'saved' ? 'active' : listType;
+
+global = replaceChatListIds(global, targetListType, result.chatIds);
 
   global = replaceChatListLoadingParameters(
   global,
-  listType,
+  targetListType,
   result.nextOffsetId,
   result.nextOffsetPeerId,
   result.nextOffsetDate,
