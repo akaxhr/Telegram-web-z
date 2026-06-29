@@ -2,13 +2,14 @@ import { supabase } from "../../../../server/lib/supabase.js";
 
 function mapUser(u) {
   return {
-    id: u.id,
+    id: String(u.id),
     firstName: u.first_name ?? "",
     lastName: u.last_name ?? "",
-    username: u.username ?? undefined,
+    username: u.username ? { username: u.username } : undefined,
     phoneNumber: u.phone_number ?? undefined,
-    type: "user",
+    type: "userTypeRegular",
     isSelf: false,
+    isBot: Boolean(u.is_bot),
     raw: u.raw ?? undefined,
   };
 }

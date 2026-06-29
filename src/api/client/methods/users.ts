@@ -1,5 +1,5 @@
 import { Api as GramJs } from '../../../lib/gramjs';
-
+import { request } from '../transport/request';
 import type {
   ApiEmojiStatusType, ApiFormattedText, ApiPeer, ApiUser,
 } from '../../types';
@@ -32,149 +32,80 @@ export async function fetchFullUser({
   id: string;
   accessHash?: string;
 }) {
-  const input = buildInputUser(id, accessHash);
-  if (!(input instanceof GramJs.InputUser)) {
-    return undefined;
+  const result = await request("users.getFullUser", { id });
+
+  if (!result) return undefined;
+
+  const user = result.users?.find((u: ApiUser) => u.id === id) || result.user;
+
+  if (user) {
+    sendApiUpdate({
+      "@type": "updateUser",
+      id,
+      user,
+      fullInfo: result.fullInfo,
+    });
   }
-
- const result = await request(
-  "users.getFullUser",
-  { id: input },
-);
-
-  if (!result) {
-    return undefined;
-  }
-
-  if (result.fullUser.profilePhoto) {
-    addPhotoToLocalDb(result.fullUser.profilePhoto);
-  }
-
-  if (result.fullUser.personalPhoto) {
-    addPhotoToLocalDb(result.fullUser.personalPhoto);
-  }
-
-  if (result.fullUser.fallbackPhoto) {
-    addPhotoToLocalDb(result.fullUser.fallbackPhoto);
-  }
-
-  const botInfo = result.fullUser.botInfo;
-  if (botInfo?.descriptionPhoto) {
-    addPhotoToLocalDb(botInfo.descriptionPhoto);
-  }
-  if (botInfo?.descriptionDocument instanceof GramJs.Document) {
-    localDb.documents[botInfo.descriptionDocument.id.toString()] = botInfo.descriptionDocument;
-  }
-
-  if (result.fullUser.businessIntro?.sticker instanceof GramJs.Document) {
-    localDb.documents[result.fullUser.businessIntro.sticker.id.toString()] = result.fullUser.businessIntro.sticker;
-  }
-
-  const fullInfo = buildApiUserFullInfo(result);
-  const users = result.users.map(buildApiUser).filter(Boolean);
-  const userStatusesById = buildApiUserStatuses(result.users);
-  const chats = result.chats.map((c) => buildApiChatFromPreview(c)).filter(Boolean);
-
-  const user = users.find(({ id: userId }) => userId === id)!;
-
-  sendApiUpdate({
-    '@type': 'updateUser',
-    id,
-    user,
-    fullInfo,
-  });
 
   return {
     user,
-    fullInfo,
-    users,
-    chats,
-    userStatusesById,
+    fullInfo: result.fullInfo,
+    users: result.users ?? (user ? [user] : []),
+    chats: result.chats ?? [],
+    userStatusesById: result.userStatusesById ?? {},
   };
 }
 
 export async function fetchCommonChats({ user, maxId }: { user: ApiUser; maxId?: string }) {
-  const result = await request(
-  "users.getCommonChats",
-  {
-    user,
+  const result = await request("users.getCommonChats", {
+    userId: user.id,
     maxId,
-  },
-);
+  });
 
-  if (!result) {
-    return undefined;
-  }
+  if (!result) return undefined;
 
-  const chats = result.chats.map((c) => buildApiChatFromPreview(c)).filter(Boolean);
-  const chatIds = chats.map(({ id: chatId }) => chatId);
-  const count = 'count' in result ? result.count : chatIds.length;
-
-  return { chatIds, count };
+  return {
+    chatIds: result.chatIds ?? [],
+    count: result.count ?? 0,
+  };
 }
 
+
 export async function fetchPaidMessagesStarsAmount(user: ApiUser) {
- const result = await request(
-  "users.getRequirementsToContact",
-  {
+  const result = await request("users.getRequirementsToContact", {
     userId: user.id,
-  },
-);
+  });
 
-  if (!result?.[0]) {
-    return undefined;
-  }
-  const requirement = result[0];
-
-  if (requirement instanceof GramJs.RequirementToContactPaidMessages) {
-    return toJSNumber(requirement.starsAmount);
-  }
-
-  return undefined;
+  return result?.starsAmount;
 }
 
 export async function fetchNearestCountry() {
- const dcInfo = await request(
-  "users.getNearestDc",
-);
-
-  return dcInfo?.country;
+  const result = await request("users.getNearestDc");
+  return result?.country;
 }
 
-export async function fetchContactList() {
-  const result = await request(
-  "users.getContacts",
-);
-  if (!result || result instanceof GramJs.contacts.ContactsNotModified) {
-    return undefined;
-  }
 
-  const users = result.users.map(buildApiUser).filter(Boolean);
-  const userStatusesById = buildApiUserStatuses(result.users);
+export async function fetchContactList() {
+  const result = await request("users.getContacts");
+
+  if (!result) return undefined;
 
   return {
-    users,
-    userStatusesById,
+    users: result.users ?? [],
+    userStatusesById: result.userStatusesById ?? {},
   };
 }
 
 export async function fetchUsers({ users }: { users: ApiUser[] }) {
-  const result = await request(
-  "users.getUsers",
-  {
+  const result = await request("users.getUsers", {
     userIds: users.map((u) => u.id),
-  },
-);
-  if (!result || !result.length) {
-    return undefined;
-  }
+  });
 
-  const apiUsers = result.map(buildApiUser).filter(Boolean);
-  const userStatusesById = buildApiUserStatuses(result);
+  if (!result) return undefined;
 
   return {
-    users: apiUsers,
-    userStatusesById,
+    users: result.users ?? result ?? [],
+    userStatusesById: result.userStatusesById ?? {},
   };
 }
 
