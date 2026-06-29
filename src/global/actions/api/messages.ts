@@ -1945,6 +1945,10 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     await rafPromise();
   }
 
+  if (!params.chat) {
+    return;
+  }
+
   let currentMessageKey: MessageKey | undefined;
   const progressCallback = params.attachment ? (progress: number, messageKey: MessageKey) => {
     if (!uploadProgressCallbacks.has(messageKey)) {
@@ -1957,15 +1961,13 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     setGlobal(global);
   } : undefined;
 
-  const result = await callApi('sendMessage', params, progressCallback);
+  await callApi('sendMessage', params, progressCallback);
 
-  if (result?.message) {
-    getActions().loadViewportMessages({
-      chatId: params.chat.id,
-      threadId: MAIN_THREAD_ID,
-      forceLastSlice: true,
-    });
-  }
+  getActions().loadViewportMessages({
+    chatId: params.chat.id,
+    threadId: MAIN_THREAD_ID,
+    forceLastSlice: true,
+  });
 
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
