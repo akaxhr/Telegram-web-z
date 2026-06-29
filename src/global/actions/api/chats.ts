@@ -3531,91 +3531,52 @@ addActionHandler('loadDiscussion', async (global, actions, payload): Promise<voi
 
 async function loadChats(
   listType: ChatListType,
-  isFullDraftSync?: boolean,
-  shouldIgnorePagination?: boolean,
+  allAtOnce?: boolean,
+  withPinned?: boolean,
 ) {
   let global = getGlobal();
-  const lastLocalServiceMessageId = selectLastServiceNotification(global)?.id;
 
-  const params = !shouldIgnorePagination ? selectChatListLoadingParameters(global, listType) : {};
-  const offsetPeer = params.nextOffsetPeerId ? selectPeer(global, params.nextOffsetPeerId) : undefined;
-  const offsetDate = params.nextOffsetDate;
-  const offsetId = params.nextOffsetId;
-
-  const isFirstBatch = !shouldIgnorePagination && !offsetPeer && !offsetDate && !offsetId;
-  const shouldReplaceStaleState = listType === 'active' && isFirstBatch;
-  const isAccountFreeze = selectIsCurrentUserFrozen(global);
-  const currentUser = selectUser(global, global.currentUserId!)!;
-
-  const result = listType === 'saved' ? await callApi('fetchSavedChats', {
-    parentPeer: currentUser,
-    limit: CHAT_LIST_LOAD_SLICE,
-    offsetDate,
-    offsetId,
-    offsetPeer,
-    withPinned: isFirstBatch && !isAccountFreeze,
-  }) : await callApi('fetchChats', {
-    limit: CHAT_LIST_LOAD_SLICE,
-    offsetDate,
-    offsetId,
-    offsetPeer,
+  const loadingParams = selectChatListLoadingParameters(global, listType);
+  const result = await callApi('fetchChats', {
+    limit: allAtOnce ? CHAT_LIST_LOAD_SLICE : CHAT_LIST_LOAD_SLICE,
     archived: listType === 'archived',
-    withPinned: isFirstBatch && !isAccountFreeze,
-    lastLocalServiceMessageId,
+    withPinned,
+    offsetId: loadingParams?.nextOffsetId,
+    offsetPeer: loadingParams?.nextOffsetPeerId
+      ? selectChat(global, loadingParams.nextOffsetPeerId)
+      : undefined,
+    offsetDate: loadingParams?.nextOffsetDate,
+    lastLocalServiceMessageId: selectLastServiceNotification(global)?.message.id,
   });
 
-  if (!result) {
-    return;
-  }
-
-  const { chatIds } = result;
+  if (!result) return undefined;
 
   global = getGlobal();
 
-  const newChats = buildCollectionByKey(result.chats, 'id');
-
+  global = updateChats(global, buildCollectionByKey(result.chats, 'id'));
   global = updateUsers(global, buildCollectionByKey(result.users, 'id'));
-  global = updateChats(global, newChats);
-  if (isFirstBatch) {
-    global = replaceChatListIds(global, listType, chatIds);
-  } else {
-    global = addChatListIds(global, listType, chatIds);
+
+  if (result.userStatusesById) {
+    global = addUserStatuses(global, result.userStatusesById);
   }
 
-  if (shouldReplaceStaleState) {
-    global = replaceUserStatuses(global, result.userStatusesById);
-    global = replaceNotifyExceptions(global, result.notifyExceptionById);
-  } else {
-    global = addUserStatuses(global, result.userStatusesById);
+  if (result.notifyExceptionById) {
     global = addNotifyExceptions(global, result.notifyExceptionById);
   }
 
-  global = updateChatListSecondaryInfo(global, listType, result);
-  global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
-
-  if (!shouldIgnorePagination) {
-    global = replaceChatListLoadingParameters(
-      global, listType, result.nextOffsetId, result.nextOffsetPeerId, result.nextOffsetDate,
-    );
+  if (result.lastMessageByChatId) {
+    global = updateChatsLastMessageId(global, result.lastMessageByChatId, listType);
   }
 
-  if (listType === 'active' || listType === 'archived') {
-    const idsToUpdateDraft = isFullDraftSync ? result.chatIds : Object.keys(result.draftsById);
-    idsToUpdateDraft.forEach((chatId) => {
-      const draft = result.draftsById[chatId];
-      const thread = selectThread(global, chatId, MAIN_THREAD_ID);
+  global = replaceChatListIds(global, listType, result.chatIds);
 
-      if (!draft && !thread) return;
+  global = replaceChatListLoadingParameters(global, listType, {
+    nextOffsetId: result.nextOffsetId,
+    nextOffsetPeerId: result.nextOffsetPeerId,
+    nextOffsetDate: result.nextOffsetDate,
+  });
 
-      if (!selectDraft(global, chatId, MAIN_THREAD_ID)?.isLocal) {
-        global = replaceThreadLocalStateParam(
-          global, chatId, MAIN_THREAD_ID, 'draft', draft,
-        );
-      }
-    });
-  }
-
-  if ((chatIds.length === 0 || chatIds.length === result.totalChatCount) && !global.chats.isFullyLoaded[listType]) {
+  if (!result.nextOffsetId && !result.nextOffsetPeerId && !result.nextOffsetDate) {
     global = {
       ...global,
       chats: {
@@ -3630,11 +3591,7 @@ async function loadChats(
 
   setGlobal(global);
 
-  return {
-    threadInfos: result.threadInfos,
-    threadReadStatesById: result.threadReadStatesById,
-    messages: result.messages,
-  };
+  return result;
 }
 
 export async function loadFullChat<T extends GlobalState>(
