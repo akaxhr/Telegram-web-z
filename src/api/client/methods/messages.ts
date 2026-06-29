@@ -164,89 +164,77 @@ export async function fetchMessages({
   addOffset?: number;
   limit: number;
 }) {
-  const RequestClass = threadId === MAIN_THREAD_ID
-    ? GramJs.messages.GetHistory : isSavedDialog
-      ? GramJs.messages.GetSavedHistory : GramJs.messages.GetReplies;
-  const isChannel = getEntityTypeById(chat.id) === 'channel';
-  let result;
+  try {
+    const result = await request('messages.fetchMessages', {
+      chatId: chat.id,
+      chat,
+      threadId,
+      offsetId,
+      isSavedDialog,
+      addOffset,
+      limit,
+    }, {
+      shouldThrow: true,
+      abortControllerChatId: chat.id,
+      abortControllerThreadId: threadId,
+    } as any);
 
-try {
-  result = await request('messages.fetchMessages', {
-    chat,
-    threadId,
-    offsetId,
-    isSavedDialog,
-    addOffset,
-    limit,
-  }, {
-    shouldThrow: true,
-    abortControllerChatId: chat.id,
-    abortControllerThreadId: threadId,
-  } as any);
-} catch (err: any) {
-  if (err.errorMessage === 'CHANNEL_PRIVATE') {
-    sendApiUpdate({
-      '@type': 'updateChat',
-      id: chat.id,
-      chat: {
-        isRestricted: true,
-      },
-    });
-  }
-}
+    if (!result) {
+      return undefined;
+    }
 
-  if (
-    !result
-    || result instanceof GramJs.messages.MessagesNotModified
-    || !result.messages
-  ) {
+    return {
+      messages: result.messages ?? [],
+      users: result.users ?? [],
+      chats: result.chats ?? [],
+      count: result.count ?? result.messages?.length ?? 0,
+      topics: result.topics ?? [],
+    };
+  } catch (err: any) {
+    console.error('[fetchMessages failed]', err);
+
     return undefined;
   }
-
-  if (isChannel && 'pts' in result) {
-    updateChannelState(chat.id, result.pts);
-  }
-
-  const messages = result.messages.map(buildApiMessage).filter(Boolean);
-  const users = result.users.map(buildApiUser).filter(Boolean);
-  const chats = result.chats.map((c) => buildApiChatFromPreview(c)).filter(Boolean);
-  const count = 'count' in result ? result.count : messages.length;
-  const topics = result.topics.map(buildApiTopicWithState).filter(Boolean);
-
-  return {
-    messages,
-    users,
-    chats,
-    count,
-    topics,
-  };
 }
 
-export async function fetchMessage({ chat, messageId }: { chat: ApiChat; messageId: number }) {
-  const isChannel = getEntityTypeById(chat.id) === 'channel';
-
-  let result;
+export async function fetchMessage({
+  chat,
+  messageId,
+}: {
+  chat: ApiChat;
+  messageId: number;
+}) {
   try {
-    result = await request(
-  "messages.fetchMessage",
-  {
-    chat,
-    messageId,
-    isChannel,
-  },
+    const result = await request(
+      "messages.fetchMessage",
+      {
+        chatId: chat.id,
+        chat,
+        messageId,
+      },
       {
         shouldThrow: true,
         abortControllerChatId: chat.id,
-      },
+      } as any,
     );
+
+    if (!result) {
+      return undefined;
+    }
+
+    if (!result.message) {
+      return MESSAGE_DELETED;
+    }
+
+    return {
+      message: result.message,
+    };
   } catch (err: any) {
     const { message, code } = buildApiError(err);
 
-    // When fetching messages for the bot @replies, there may be situations when the user was banned
-    // in the comment group or this group was deleted
-    if (message !== 'CHANNEL_PRIVATE') {
+    if (message !== "CHANNEL_PRIVATE") {
       sendApiUpdate({
-        '@type': 'error',
+        "@type": "error",
         error: {
           message,
           code,
@@ -255,70 +243,42 @@ export async function fetchMessage({ chat, messageId }: { chat: ApiChat; message
         },
       });
     }
-  }
 
-  if (!result || result instanceof GramJs.messages.MessagesNotModified) {
     return undefined;
   }
-
-  if (isChannel && 'pts' in result) {
-    updateChannelState(chat.id, result.pts);
-  }
-
-  const mtpMessage = result.messages[0];
-  if (!mtpMessage) {
-    return undefined;
-  }
-
-  if (mtpMessage instanceof GramJs.MessageEmpty) {
-    return MESSAGE_DELETED;
-  }
-
-  processMessageAndUpdateThreadInfo(mtpMessage);
-  const message = buildApiMessage(mtpMessage);
-
-  if (!message) {
-    return undefined;
-  }
-
-  return { message };
 }
 
-export async function fetchRichMessage({ chat, messageId }: { chat: ApiChat; messageId: number }) {
-  const isChannel = getEntityTypeById(chat.id) === 'channel';
-const result = await request(
+export async function fetchRichMessage({
+  chat,
+  messageId,
+}: {
+  chat: ApiChat;
+  messageId: number;
+}) {
+  try {
+    const result = await request(
+      "messages.fetchRichMessage",
+      {
+        chatId: chat.id,
+        chat,
+        messageId,
+      },
+      {
+        abortControllerChatId: chat.id,
+      } as any,
+    );
 
-  "messages.fetchRichMessage",
-  {
-    chat,
-    messageId,
-  },
-  {
-    abortControllerChatId: chat.id,
-  },
-);
+    if (!result?.message) {
+      return undefined;
+    }
 
-  if (!result || result instanceof GramJs.messages.MessagesNotModified) {
+    return {
+      message: result.message,
+    };
+  } catch (err) {
+    console.error("[fetchRichMessage failed]", err);
     return undefined;
   }
-
-  if (isChannel && 'pts' in result) {
-    updateChannelState(chat.id, result.pts);
-  }
-
-  const mtpMessage = result.messages[0];
-  if (!mtpMessage || mtpMessage instanceof GramJs.MessageEmpty) {
-    return undefined;
-  }
-
-  processMessageAndUpdateThreadInfo(mtpMessage);
-  const message = buildApiMessage(mtpMessage);
-
-  if (!message) {
-    return undefined;
-  }
-
-  return { message };
 }
 
 export async function fetchMessagesById({ chat, messageIds }: { chat: ApiChat; messageIds: number[] }) {
