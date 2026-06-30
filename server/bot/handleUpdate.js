@@ -46,12 +46,15 @@ export async function handleTelegramUpdate(update) {
       updated_at: new Date().toISOString(),
     });
   }
+console.log("[AVATAR] senderId", senderId);
 
   try {
   const photos = await telegram.call("getUserProfilePhotos", {
     user_id: Number(senderId),
     limit: 1,
   });
+
+  console.log("[AVATAR] photos", JSON.stringify(photos));
 
   const fileId = photos.photos?.[0]?.[0]?.file_id;
 
