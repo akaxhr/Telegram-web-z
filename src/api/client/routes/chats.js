@@ -11,7 +11,6 @@ function mapChatType(type) {
   return "chatTypeBasicGroup";
 }
 
-const colorId = Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7);
 function mapChat(c) {
   return {
     id: String(c.id),
@@ -42,11 +41,12 @@ function mapChat(c) {
     hasUsername: Boolean(c.username),
 
 
+const colorId = Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7);
+
 color: {
   type: "regular",
   color: colorId,
 },
-  };
 }
 
 function mapUser(u) {
@@ -65,6 +65,8 @@ function mapUser(u) {
       : undefined,
 
     avatarPhotoId: u.photo ? String(u.id) : undefined,
+const colorId = Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7);
+
 color: {
   type: "regular",
   color: colorId,
