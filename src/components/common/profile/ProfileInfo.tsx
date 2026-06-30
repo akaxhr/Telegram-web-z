@@ -189,7 +189,27 @@ const peerWithPhoto = peer ? {
         storyColors: [collectibleEmojiStatus.textColor, collectibleEmojiStatus.textColor],
       };
     }
+console.group("===== PROFILE INFO =====");
 
+console.log("peerId:", peerId);
+
+console.log("USER:", user);
+console.log("CHAT:", chat);
+console.log("PEER:", peer);
+
+if (user) {
+  console.log("user.photoUrl:", (user as any).photoUrl);
+  console.log("user.avatarPhotoId:", user.avatarPhotoId);
+  console.log("user.photo:", (user as any).photo);
+}
+
+if (chat) {
+  console.log("chat.photoUrl:", (chat as any).photoUrl);
+  console.log("chat.avatarPhotoId:", (chat as any).avatarPhotoId);
+  console.log("chat.photo:", (chat as any).photo);
+}
+
+console.groupEnd();
     const colors = profileColorOption
       && (theme === 'dark' ? profileColorOption.darkColors : profileColorOption.colors);
     if (!colors) return undefined;
@@ -421,27 +441,7 @@ const peerWithPhoto = peer ? {
     const iconName = (iconLevel < 10
       ? `rating-icons-level${iconLevel}`
       : `rating-icons-level${Math.floor(iconLevel / 10) * 10}`) as IconName;
-console.group("===== PROFILE INFO =====");
 
-console.log("peerId:", peerId);
-
-console.log("USER:", user);
-console.log("CHAT:", chat);
-console.log("PEER:", peer);
-
-if (user) {
-  console.log("user.photoUrl:", (user as any).photoUrl);
-  console.log("user.avatarPhotoId:", user.avatarPhotoId);
-  console.log("user.photo:", (user as any).photo);
-}
-
-if (chat) {
-  console.log("chat.photoUrl:", (chat as any).photoUrl);
-  console.log("chat.avatarPhotoId:", (chat as any).avatarPhotoId);
-  console.log("chat.photo:", (chat as any).photo);
-}
-
-console.groupEnd();
 
     return (
       <span role="button" tabIndex={0} className={styles.userRatingWrapper} onClick={onRatingClick}>
