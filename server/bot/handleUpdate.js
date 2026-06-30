@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase.js";
+import { telegram } from "../lib/telegram.js";
 
 function msgFromUpdate(update) {
   return (
