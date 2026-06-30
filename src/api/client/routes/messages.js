@@ -197,7 +197,19 @@ async function loadMessagesByChat(payload = {}) {
 
   const messages = (messageRows ?? []).map(normalizeMessageRow).filter(Boolean);
   const users = (userRows ?? []).map(normalizeUserRow).filter(Boolean);
-  const chats = (chatRows ?? []).map(normalizeChatRow).filter(Boolean);
+
+const userById = Object.fromEntries(users.map((u) => [u.id, u]));
+
+const chats = (chatRows ?? []).map((chat) => {
+  const normalized = normalizeChatRow(chat);
+  const sameUser = userById[String(chat.id)];
+
+  return {
+    ...normalized,
+    photoUrl: sameUser?.photoUrl,
+    avatarPhotoId: sameUser?.avatarPhotoId,
+  };
+}).filter(Boolean);
 
   return {
     messages,

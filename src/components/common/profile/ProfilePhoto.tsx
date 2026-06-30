@@ -191,7 +191,7 @@ const ProfilePhoto = ({
     isAnonymousForwards && 'anonymous-forwards',
     isDeleted && 'deleted-account',
     isRepliesChat && 'replies-bot-account',
-    (!isSavedMessages && !hasMedia) && 'no-photo',
+    (!isSavedMessages && !hasMedia && !customPhotoUrl) && 'no-photo',
     className,
   );
 
