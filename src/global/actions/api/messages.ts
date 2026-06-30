@@ -1933,6 +1933,7 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
 
 
 async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
+  console.log('[INNER SENDMESSAGE FIRED]', params);
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
