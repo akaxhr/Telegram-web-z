@@ -12,6 +12,8 @@ function mapChatType(type) {
 }
 
 function mapChat(c) {
+  const colorId = Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7);
+  
   return {
     id: String(c.id),
     type: mapChatType(c.type),
@@ -40,9 +42,6 @@ function mapChat(c) {
 
     hasUsername: Boolean(c.username),
 
-
-const colorId = Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7);
-
 color: {
   type: "regular",
   color: colorId,
@@ -50,6 +49,8 @@ color: {
 }
 
 function mapUser(u) {
+
+  const colorId = Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7);
   return {
     id: String(u.id),
     type: "userTypeRegular",
@@ -65,7 +66,6 @@ function mapUser(u) {
       : undefined,
 
     avatarPhotoId: u.photo ? String(u.id) : undefined,
-const colorId = Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7);
 
 color: {
   type: "regular",
@@ -75,6 +75,8 @@ color: {
 }
 
 function mapMessage(m) {
+
+  
   return {
     id: Number(m.id),
     chatId: String(m.chat_id),
