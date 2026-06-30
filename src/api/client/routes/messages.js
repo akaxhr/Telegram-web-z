@@ -138,6 +138,8 @@ function normalizeChatRow(c) {
     isArchived: Boolean(c.is_archived ?? c.isArchived),
     isForum: Boolean(c.is_forum ?? c.isForum),
     withForumTabs: Boolean(c.with_forum_tabs ?? c.withForumTabs),
+    photoUrl: c.photo || c.avatar_path || undefined,
+    avatarPhotoId: c.avatar_path || c.avatar_file_id || undefined,
   };
 }
 
@@ -196,8 +198,7 @@ async function loadMessagesByChat(payload = {}) {
   if (chatError) throw chatError;
 
   const messages = (messageRows ?? []).map(normalizeMessageRow).filter(Boolean);
-  const users = (userRows ?? []).map(normalizeUserRow).filter(Boolean);
-
+ const users = (userRows ?? []).map(normalizeUserRow).filter(Boolean);
 const userById = Object.fromEntries(users.map((u) => [u.id, u]));
 
 const chats = (chatRows ?? []).map((chat) => {
@@ -206,8 +207,8 @@ const chats = (chatRows ?? []).map((chat) => {
 
   return {
     ...normalized,
-    photoUrl: sameUser?.photoUrl,
-    avatarPhotoId: sameUser?.avatarPhotoId,
+    photoUrl: normalized.photoUrl || sameUser?.photoUrl,
+    avatarPhotoId: normalized.avatarPhotoId || sameUser?.avatarPhotoId,
   };
 }).filter(Boolean);
 

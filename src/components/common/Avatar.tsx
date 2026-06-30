@@ -187,12 +187,7 @@ const Avatar = ({
 
     return undefined;
   }, [isCustomPeer, isSavedMessages, isDeleted, isReplies, isAnonymousForwards, peer, isSavedDialog]);
-console.log("[AVATAR]", {
-  peerId: realPeer?.id,
-  customPhotoUrl: customPhotoUrl?.slice?.(0, 40),
-  imgBlobUrl,
-  previewUrl,
-});
+
   const imgBlobUrl = useMedia(imageHash, false, ApiMediaFormat.BlobUrl);
   const videoBlobUrl = useMedia(videoHash, !shouldLoadVideo, ApiMediaFormat.BlobUrl);
   const imgUrl = imgBlobUrl || customPhotoUrl || previewUrl;
@@ -292,7 +287,7 @@ console.log("[AVATAR]", {
     withStorySolid && forceFriendStorySolid && 'close-friend',
     withStorySolid && (realPeer?.hasUnreadStories || forceUnreadStorySolid) && 'has-unread-story',
     (onClick || isStoryClickable) && 'interactive',
-    (!isSavedMessages && !imgUrl) && 'no-photo',
+    (!isSavedMessages && !imgUrl && !customPhotoUrl) && 'no-photo',
   );
 
   const fullStyle = buildStyle(
