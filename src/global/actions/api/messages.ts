@@ -1937,7 +1937,25 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
+async function sendMessage<T extends GlobalState>(
+  global: T,
+  params: SendMessageParams,
+) {
+  console.log('[INNER SENDMESSAGE FIRED]', params);
 
+  if (params.replyInfo || IS_IOS) {
+    console.log('[SEND WAIT RAF]');
+    await rafPromise();
+  }
+
+  if (!params.chat) {
+    console.log('[SEND STOP] params.chat missing', params);
+    return;
+  }
+
+  console.log('[SEND BEFORE LOCAL]');
+
+  // Leave the rest of your code unchanged for now.
   if (!params.chat) return;
 
   let currentMessageKey: MessageKey | undefined;
@@ -1951,13 +1969,14 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     global = updateUploadByMessageKey(global, messageKey, progress);
     setGlobal(global);
   } : undefined;
-
+console.log('[SEND CALLING LOCAL]');
  const localMessage = await callApi('sendMessageLocal', params);
-
+console.log('[SEND AFTER LOCAL]', localMessage);
+console.log('[SEND BEFORE API]');
 if (localMessage) {
   await callApi('sendApiMessage', params, localMessage, progressCallback);
 }
-
+console.log('[SEND AFTER API]');
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
     global = updateUploadByMessageKey(global, currentMessageKey, undefined);
