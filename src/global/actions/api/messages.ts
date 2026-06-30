@@ -1936,7 +1936,6 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
 
 
 async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
-  // @optimization
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
@@ -1957,9 +1956,12 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     setGlobal(global);
   } : undefined;
 
-  await callApi('sendMessage', params, progressCallback);
-  // Do NOT reload viewport here.
-  // Real Telegram-style animation must come from local optimistic message + update replacement.
+  const localMessage = await callApi('sendMessageLocal', params);
+
+  await callApi('sendMessage', {
+    ...params,
+    localMessage,
+  }, progressCallback);
 
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
