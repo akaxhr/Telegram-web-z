@@ -10,11 +10,13 @@ export async function request<T = any>(
   options: RequestOptions = {},
 ): Promise<T | undefined> {
   try {
+    console.log("[REQUEST OUT]", method, payload);
     const response =  await fetch("/api/client/request", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      
       body: JSON.stringify({
         method,
         payload,
@@ -23,7 +25,7 @@ export async function request<T = any>(
     });
 
     const result = await response.json();
-
+console.log("[REQUEST IN]", method, result);
     if (!response.ok) {
       if (options.shouldThrow) {
         throw new Error(result?.error ?? `Request failed: ${response.status}`);
