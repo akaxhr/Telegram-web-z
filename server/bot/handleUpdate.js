@@ -53,30 +53,22 @@ async function saveTelegramAvatar(senderId) {
     }
 
     const buffer = Buffer.from(await imgRes.arrayBuffer());
-    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+ const contentType = "image/jpeg";
+const storagePath = `${senderId}.jpg`;
     const ext = contentType.includes("png") ? "png" : "jpg";
-    const storagePath = `${senderId}.${ext}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(AVATAR_BUCKET)
-      .upload(storagePath, buffer, {
-        contentType,
-        upsert: true,
-      });
+const { error: uploadError } = await supabase.storage
+  .from(AVATAR_BUCKET)
+  .upload(storagePath, buffer, {
+    contentType: "image/jpeg",
+    upsert: true,
+  });
 
     if (uploadError) {
       console.error("[AVATAR] upload failed", uploadError);
       return;
     }
     
-    console.log("[AVATAR] fileId", fileId);
-console.log("[AVATAR] file", file);
-
-console.log("[AVATAR] download", imgRes.status, imgRes.headers.get("content-type"));
-
-console.log("[AVATAR] uploading to", storagePath);
-
-console.log("[AVATAR] uploadError", uploadError);
     const { data: publicUrlData } = supabase.storage
       .from(AVATAR_BUCKET)
       .getPublicUrl(storagePath);
