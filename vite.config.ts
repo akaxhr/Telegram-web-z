@@ -288,7 +288,7 @@ function buildCsp(appEnv: string) {
   script-src 'self' 'wasm-unsafe-eval' https://t.me/_websync_ https://telegram.me/_websync_;
   style-src 'self' 'unsafe-inline';
   font-src 'self' data:;
-  img-src 'self' data: blob: https://ss3.4sqi.net/img/categories_v2/;
+  img-src 'self' data: blob: https://ss3.4sqi.net/img/categories_v2/ https://*.supabase.co;
   media-src 'self' blob: data:;
   object-src 'none';
   frame-src http: https:

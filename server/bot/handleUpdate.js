@@ -64,6 +64,12 @@ const { error: uploadError } = await supabase.storage
     upsert: true,
   });
 
+  console.log({
+  contentType,
+  bufferType: buffer.constructor.name,
+  bufferLength: buffer.length,
+});
+
     if (uploadError) {
       console.error("[AVATAR] upload failed", uploadError);
       return;
