@@ -1928,12 +1928,18 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
   sendParams: SendMessageParams,
   localMessages: SendMessageParams[],
 ) {
+  console.log('[SEND OR REDUCE PARAMS]', sendParams);
   await sendMessage(global, sendParams);
 }
 
 
 async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
   console.log('[INNER SENDMESSAGE FIRED]', params);
+
+if (!params) {
+  console.log('[SEND STOP] params undefined');
+  return;
+}
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
