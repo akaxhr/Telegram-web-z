@@ -77,7 +77,6 @@ console.log("[AVATAR] download", imgRes.status, imgRes.headers.get("content-type
 console.log("[AVATAR] uploading to", storagePath);
 
 console.log("[AVATAR] uploadError", uploadError);
-
     const { data: publicUrlData } = supabase.storage
       .from(AVATAR_BUCKET)
       .getPublicUrl(storagePath);
