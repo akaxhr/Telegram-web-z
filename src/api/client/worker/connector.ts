@@ -14,7 +14,6 @@ import generateUniqueId from '../../../util/generateUniqueId';
 import { ACCOUNT_SLOT, DATA_BROADCAST_CHANNEL_NAME } from '../../../util/multiaccount';
 import { pause, throttleWithTickEnd } from '../../../util/schedulers';
 import { callApiClient } from '../../client';
-import { buildLocalMessage } from '../apiBuilders/messages';
 
 type RequestState = {
   messageId: string;
@@ -188,77 +187,7 @@ export async function callApi<T extends keyof Methods>(
   'fetchLangPack',
   'fetchChat',
 ]);
-  if (String(fnName) === 'sendMessageLocal') {
-  const params: any = args[0];
-
-  const { message: localMessage, poll: localPoll } = buildLocalMessage({
-    chat: params.chat,
-    lastMessageId: params.lastMessageId,
-    text: params.text,
-    entities: params.entities,
-    replyInfo: params.replyInfo,
-    suggestedPostInfo: params.suggestedPostInfo,
-    attachment: params.attachment,
-    sticker: params.sticker,
-    gif: params.gif,
-    poll: params.poll,
-    todo: params.todo,
-    contact: params.contact,
-    groupedId: params.groupedId,
-    scheduledAt: params.scheduledAt,
-    scheduleRepeatPeriod: params.scheduleRepeatPeriod,
-    sendAs: params.sendAs,
-    story: params.story,
-    isInvertedMedia: params.isInvertedMedia,
-    effectId: params.effectId,
-    isPending: params.isPending,
-    messagePriceInStars: params.messagePriceInStars,
-    dice: params.dice,
-  });
-
-  updateCallback({
-    '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
-    id: localMessage.id,
-    chatId: params.chat.id,
-    message: localMessage,
-    poll: localPoll,
-    wasDrafted: params.wasDrafted,
-  });
-
-  return localMessage as unknown as Awaited<MethodResponse<T>>;
-}
-
-if (String(fnName) === 'sendApiMessage') {
-  const [params, localMessage] = args as any;
-
-  try {
-    const result = await callApiClient('messages.sendMessage', {
-      ...params,
-      localMessage,
-    });
-
-    if (result?.message) {
-      updateCallback({
-        '@type': localMessage.isScheduled ? 'updateScheduledMessage' : 'updateMessage',
-        id: localMessage.id,
-        chatId: params.chat.id,
-        message: result.message,
-        isFull: true,
-      });
-    }
-
-    return result as unknown as Awaited<MethodResponse<T>>;
-  } catch (err: any) {
-    updateCallback({
-      '@type': localMessage.isScheduled ? 'updateScheduledMessageSendFailed' : 'updateMessageSendFailed',
-      chatId: params.chat.id,
-      localId: localMessage.id,
-      error: err?.message || 'SEND_FAILED',
-    });
-
-    return undefined as Awaited<MethodResponse<T>>;
-  }
-}
+  
   const methodMap: Record<string, string> = {
   // ==========================
   // Messages
