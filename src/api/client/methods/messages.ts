@@ -307,264 +307,55 @@ export async function fetchMessagesById({
   return result.messages ?? [];
 }
 
-eexport function sendApiMessage(
+export function sendMessageLocal(
   params: SendMessageParams,
-  localMessage: ApiMessage,
-  onProgress?: ApiOnProgress,
 ) {
   const {
-    chat, text, entities, replyInfo, suggestedPostInfo, suggestedMedia,
-    attachment, sticker, story, gif, poll, todo, contact, dice,
-    isSilent, scheduledAt, scheduleRepeatPeriod, groupedId, noWebPage, sendAs, shouldUpdateStickerSetOrder,
-    isInvertedMedia, effectId, webPageMediaSize, webPageUrl, messagePriceInStars,
+    chat, lastMessageId, text, entities, replyInfo, suggestedPostInfo, attachment, sticker, story, gif, poll, todo,
+    contact, scheduledAt, scheduleRepeatPeriod, groupedId, sendAs, wasDrafted, isInvertedMedia, effectId, isPending,
+    messagePriceInStars, dice,
   } = params;
 
   if (!chat) return undefined;
 
-  let isSendCompleted = false;
+  const {
+    message: localMessage,
+    poll: localPoll,
+  } = buildLocalMessage({
+    chat,
+    lastMessageId,
+    text,
+    entities,
+    replyInfo,
+    suggestedPostInfo,
+    attachment,
+    sticker,
+    gif,
+    poll,
+    todo,
+    contact,
+    groupedId,
+    scheduledAt,
+    scheduleRepeatPeriod,
+    sendAs,
+    story,
+    isInvertedMedia,
+    effectId,
+    isPending,
+    messagePriceInStars,
+    dice,
+  });
 
-  const timeout = setTimeout(() => {
-    if (isSendCompleted) return;
+  sendApiUpdate({
+    '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
+    id: localMessage.id,
+    chatId: chat.id,
+    message: localMessage,
+    poll: localPoll,
+    wasDrafted,
+  });
 
-    sendApiUpdate({
-      '@type': localMessage.isScheduled ? 'updateScheduledMessage' : 'updateMessage',
-      id: localMessage.id,
-      chatId: chat.id,
-      message: {
-        sendingState: 'messageSendingStatePending',
-      },
-      isFull: false,
-    });
-  }, FAST_SEND_TIMEOUT);
-
-  const cancelSendingStatusTimeout = () => {
-    isSendCompleted = true;
-    clearTimeout(timeout);
-  };
-
-  const randomId = generateRandomBigInt();
-
-  if (groupedId) {
-    return sendGroupedMedia({
-      chat,
-      text,
-      entities,
-      replyInfo,
-      suggestedPostInfo,
-      attachment: attachment!,
-      groupedId,
-      isSilent,
-      scheduledAt,
-      scheduleRepeatPeriod,
-      sendAs,
-      messagePriceInStars,
-    }, randomId, localMessage, onProgress, cancelSendingStatusTimeout) as ReturnType<typeof sendApiMessage>;
-  }
-
-  const messagePromise = (async () => {
-    let media: GramJs.TypeInputMedia | undefined;
-
-    if (suggestedPostInfo && suggestedMedia && !attachment) {
-      if (suggestedMedia.photo) {
-        const inputPhoto = buildInputPhoto(suggestedMedia.photo);
-        if (inputPhoto) {
-          media = new GramJs.InputMediaPhoto({
-            id: inputPhoto,
-            spoiler: suggestedMedia.photo.isSpoiler || undefined,
-          });
-        }
-      } else if (suggestedMedia.video) {
-        const inputDocument = buildInputDocument(suggestedMedia.video);
-        if (inputDocument) {
-          media = new GramJs.InputMediaDocument({
-            id: inputDocument,
-            spoiler: suggestedMedia.video.isSpoiler || undefined,
-          });
-        }
-      } else if (suggestedMedia.document) {
-        const document = suggestedMedia.document;
-        if (document.id) {
-          const localDocument = localDb.documents[document.id];
-          if (localDocument) {
-            const inputDocument = new GramJs.InputDocument({
-              id: localDocument.id,
-              accessHash: localDocument.accessHash,
-              fileReference: localDocument.fileReference,
-            });
-
-            media = new GramJs.InputMediaDocument({
-              id: inputDocument,
-            });
-          }
-        }
-      }
-    }
-
-    if (!media && attachment?.gif) {
-      media = buildInputMediaDocument(attachment.gif, attachment.shouldSendAsSpoiler);
-    }
-
-    if (!media && attachment) {
-      try {
-        media = await uploadMedia(localMessage, attachment, onProgress!);
-      } catch (err) {
-        if (DEBUG) {
-          // eslint-disable-next-line no-console
-          console.warn(err);
-        }
-
-        await mediaQueue;
-        return;
-      }
-    } else if (sticker) {
-      media = buildInputMediaDocument(sticker);
-    } else if (gif) {
-      media = buildInputMediaDocument(gif);
-    } else if (poll) {
-      try {
-        const attachedMedia = poll.attachedMedia
-          ? await uploadMedia(localMessage, poll.attachedMedia, onProgress!)
-          : undefined;
-
-        const solutionMedia = poll.solutionMedia
-          ? await uploadMedia(localMessage, poll.solutionMedia, onProgress!)
-          : undefined;
-
-        media = buildInputPoll(poll, randomId, {
-          attachedMedia,
-          solutionMedia,
-        });
-      } catch (err) {
-        if (DEBUG) {
-          // eslint-disable-next-line no-console
-          console.warn(err);
-        }
-
-        await mediaQueue;
-        return;
-      }
-    } else if (todo) {
-      media = buildInputTodo(todo);
-    } else if (story) {
-      media = buildInputStory(story);
-    } else if (webPageUrl && webPageMediaSize) {
-      media = new GramJs.InputMediaWebPage({
-        url: webPageUrl,
-        forceLargeMedia: webPageMediaSize === 'large' ? true : undefined,
-        forceSmallMedia: webPageMediaSize === 'small' ? true : undefined,
-      });
-    } else if (contact) {
-      media = new GramJs.InputMediaContact({
-        phoneNumber: contact.phoneNumber,
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        vcard: DEFAULT_PRIMITIVES.STRING,
-      });
-    } else if (dice) {
-      media = new GramJs.InputMediaDice({
-        emoticon: dice,
-      });
-    }
-
-    type SharedKeys<T, U> = {
-      [K in keyof T & keyof U]:
-      T[K] extends U[K] ? (U[K] extends T[K] ? K : never) : never
-    }[keyof T & keyof U];
-
-    type SharedRecord<T, U> = Pick<T, SharedKeys<T, U>>;
-
-    type SendMediaArgs = ConstructorParameters<typeof GramJs.messages.SendMedia>[0];
-    type SendMessageArgs = ConstructorParameters<typeof GramJs.messages.SendMessage>[0];
-
-    type SharedArgs = SharedRecord<SendMediaArgs, SendMessageArgs>;
-
-    const args: SharedArgs = {
-      clearDraft: true,
-      message: text || DEFAULT_PRIMITIVES.STRING,
-      entities: entities ? entities.map(buildMtpMessageEntity) : undefined,
-      peer: buildInputPeer(chat.id, chat.accessHash),
-      randomId,
-      replyTo: replyInfo && buildInputReplyTo(replyInfo),
-      silent: isSilent || undefined,
-      scheduleDate: scheduledAt,
-      scheduleRepeatPeriod,
-      sendAs: sendAs && buildInputPeer(sendAs.id, sendAs.accessHash),
-      updateStickersetsOrder: shouldUpdateStickerSetOrder || undefined,
-      invertMedia: isInvertedMedia || undefined,
-      effect: effectId ? BigInt(effectId) : undefined,
-      allowPaidStars: messagePriceInStars ? BigInt(messagePriceInStars) : undefined,
-      suggestedPost: suggestedPostInfo && buildInputSuggestedPost(suggestedPostInfo),
-    };
-
-    try {
-      let update;
-
-      if (media) {
-        update = await request(
-          'messages.sendMedia',
-          {
-            chatId: chat.id,
-            localMessage,
-            text,
-            entities,
-            replyInfo,
-            isSilent,
-            scheduledAt,
-            noWebPage,
-            media,
-            args,
-          },
-          {
-            shouldThrow: true,
-            shouldIgnoreUpdates: true,
-          } as any,
-        );
-      } else {
-        update = await request(
-          'messages.sendMessage',
-          {
-            chatId: chat.id,
-            localMessage,
-            text,
-            entities,
-            replyInfo,
-            isSilent,
-            scheduledAt,
-            noWebPage,
-          },
-          {
-            shouldThrow: true,
-            shouldIgnoreUpdates: true,
-          } as any,
-        );
-      }
-
-      cancelSendingStatusTimeout();
-
-      if (update?.message) {
-        sendApiUpdate({
-          '@type': localMessage.isScheduled ? 'updateScheduledMessage' : 'updateMessage',
-          id: localMessage.id,
-          chatId: chat.id,
-          message: update.message,
-          isFull: true,
-        });
-      } else if (update) {
-        handleLocalMessageUpdate(localMessage, update);
-      }
-    } catch (error: any) {
-      cancelSendingStatusTimeout();
-
-      sendApiUpdate({
-        '@type': localMessage.isScheduled ? 'updateScheduledMessageSendFailed' : 'updateMessageSendFailed',
-        chatId: chat.id,
-        localId: localMessage.id,
-        error: error.errorMessage || error.message || 'SEND_FAILED',
-      });
-    }
-  })();
-
-  return messagePromise;
+  return Promise.resolve(localMessage);
 }
 
 export function sendApiMessage(
@@ -826,156 +617,7 @@ export function sendApiMessage(
 
   return messagePromise;
 }
-async function fetchInputMedia(
-  peer: GramJs.TypeInputPeer,
-  uploadedMedia: GramJs.InputMediaUploadedPhoto | GramJs.InputMediaUploadedDocument,
-) {
-  const messageMedia = await request(
-    'messages.uploadMedia',
-    {
-      peer,
-      uploadedMedia,
-    },
-  );
 
-  if (!messageMedia) return undefined;
-
-  const isSpoiler = uploadedMedia.spoiler;
-
-  if (
-    messageMedia instanceof GramJs.MessageMediaPhoto
-    && messageMedia.photo
-    && messageMedia.photo instanceof GramJs.Photo
-  ) {
-    const { photo: { id, accessHash, fileReference } } = messageMedia;
-
-    return new GramJs.InputMediaPhoto({
-      id: new GramJs.InputPhoto({ id, accessHash, fileReference }),
-      spoiler: isSpoiler,
-    });
-  }
-
-  if (
-    messageMedia instanceof GramJs.MessageMediaDocument
-    && messageMedia.document
-    && messageMedia.document instanceof GramJs.Document
-  ) {
-    const { document: { id, accessHash, fileReference } } = messageMedia;
-
-    return new GramJs.InputMediaDocument({
-      id: new GramJs.InputDocument({ id, accessHash, fileReference }),
-      spoiler: isSpoiler,
-    });
-  }
-
-  return undefined;
-}
-
-export async function editMessage({
-  chat,
-  message,
-  text,
-  entities,
-  attachment,
-  noWebPage,
-}: {
-  chat: ApiChat;
-  message: ApiMessage;
-  text: string;
-  entities?: ApiMessageEntity[];
-  attachment?: ApiAttachment;
-  noWebPage?: boolean;
-}, onProgress?: ApiOnProgress) {
-  const isScheduled = message.date * 1000 > getServerTime() * 1000;
-
-  const media = attachment && buildUploadingMedia(attachment);
-
-  const isInvertedMedia = text && !attachment?.shouldSendAsFile ? message.isInvertedMedia : undefined;
-
-  const newContent = {
-    ...(media || message.content),
-    ...(text && {
-      text: {
-        text,
-        entities,
-      },
-    }),
-  };
-
-  const messageUpdate: ApiMessage = {
-    ...message,
-    content: newContent,
-    isInvertedMedia,
-  };
-
-  sendApiUpdate({
-    '@type': isScheduled ? 'updateScheduledMessage' : 'updateMessage',
-    id: message.id,
-    chatId: chat.id,
-    message: messageUpdate,
-    isFull: true,
-  });
-
-  try {
-    let mediaUpdate: GramJs.TypeInputMedia | undefined;
-
-    if (attachment) {
-      mediaUpdate = await uploadMedia(message, attachment, onProgress!);
-    }
-
-    const result = await request(
-      'messages.editMessage',
-      {
-        chatId: chat.id,
-        chat,
-        message,
-        messageId: message.id,
-        text,
-        entities,
-        mediaUpdate,
-        isScheduled,
-        noWebPage,
-        isInvertedMedia,
-      },
-      {
-        shouldThrow: true,
-      } as any,
-    );
-
-    if (result?.message) {
-      sendApiUpdate({
-        '@type': isScheduled ? 'updateScheduledMessage' : 'updateMessage',
-        id: message.id,
-        chatId: chat.id,
-        message: result.message,
-        isFull: true,
-      });
-    }
-  } catch (err) {
-    if (DEBUG) {
-      // eslint-disable-next-line no-console
-      console.warn(err);
-    }
-
-    const apiError = buildApiError(err as Error);
-
-    sendApiUpdate({
-      '@type': 'error',
-      error: {
-        ...apiError,
-        hasErrorKey: true,
-      },
-    });
-
-    sendApiUpdate({
-      '@type': isScheduled ? 'updateScheduledMessage' : 'updateMessage',
-      id: message.id,
-      chatId: chat.id,
-      message,
-      isFull: true,
-    });
-  }
-}
 
 export async function editTodo({
   chat,

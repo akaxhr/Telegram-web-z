@@ -194,7 +194,6 @@ if (!chat) return;
 
 const result = await callApi('fetchMessages', {
   chat,
-  chatId: chat.id,
   threadId,
   offsetId: undefined,
   addOffset: undefined,
@@ -1962,12 +1961,9 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
   } : undefined;
 
   await callApi('sendMessage', params, progressCallback);
-
-  getActions().loadViewportMessages({
-    chatId: params.chat.id,
-    threadId: MAIN_THREAD_ID,
-    forceLastSlice: true,
-  });
+  
+  // Do NOT reload viewport here.
+  // Real Telegram-style animation must come from local optimistic message + update replacement.
 
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
