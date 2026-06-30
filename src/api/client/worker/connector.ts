@@ -8,6 +8,7 @@ import { DEBUG, IGNORE_UNHANDLED_ERRORS } from '../../../config';
 import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_SAFARI } from '../../../util/browser/windowEnvironment';
 import { logDebugMessage } from '../../../util/debugConsole';
+import { buildLocalMessage } from '../apiBuilders/messages';
 import Deferred from '../../../util/Deferred';
 import { getCurrentTabId, subscribeToMasterChange } from '../../../util/establishMultitabRole';
 import generateUniqueId from '../../../util/generateUniqueId';
@@ -187,7 +188,47 @@ export async function callApi<T extends keyof Methods>(
   'fetchLangPack',
   'fetchChat',
 ]);
-  
+  if (String(fnName) === 'sendMessageLocal') {
+  console.log('[LOCAL HIT] sendMessageLocal');
+
+  const params: any = args[0];
+
+  const { message: localMessage, poll: localPoll } = buildLocalMessage({
+    chat: params.chat,
+    lastMessageId: params.lastMessageId,
+    text: params.text,
+    entities: params.entities,
+    replyInfo: params.replyInfo,
+    suggestedPostInfo: params.suggestedPostInfo,
+    attachment: params.attachment,
+    sticker: params.sticker,
+    story: params.story,
+    gif: params.gif,
+    poll: params.poll,
+    todo: params.todo,
+    contact: params.contact,
+    groupedId: params.groupedId,
+    scheduledAt: params.scheduledAt,
+    scheduleRepeatPeriod: params.scheduleRepeatPeriod,
+    sendAs: params.sendAs,
+    isInvertedMedia: params.isInvertedMedia,
+    effectId: params.effectId,
+    isPending: params.isPending,
+    messagePriceInStars: params.messagePriceInStars,
+    dice: params.dice,
+  });
+
+  updateCallback({
+    '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
+    id: localMessage.id,
+    chatId: params.chat.id,
+    message: localMessage,
+    poll: localPoll,
+    wasDrafted: params.wasDrafted,
+  });
+
+  return localMessage as unknown as Awaited<MethodResponse<T>>;
+}
   const methodMap: Record<string, string> = {
   // ==========================
   // Messages
