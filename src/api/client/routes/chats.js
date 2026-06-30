@@ -34,29 +34,30 @@ function mapChat(c) {
     membersCount: c.members_count ?? undefined,
     paidMessagesStars: c.paid_messages_stars ?? undefined,
 
-    usernames: u.username
-  ? [{ username: u.username, isActive: true, isEditable: false }]
-  : undefined,
-hasUsername: Boolean(u.username),
+    usernames: c.username
+      ? [{ username: c.username, isActive: true, isEditable: false }]
+      : undefined,
+
+    hasUsername: Boolean(c.username),
   };
 }
 
 function mapUser(u) {
-  const hasPhoto = Boolean(u.photo);
-
   return {
     id: String(u.id),
     type: "userTypeRegular",
     firstName: u.first_name ?? "",
     lastName: u.last_name ?? "",
     username: u.username ?? undefined,
-    usernames: u.username ? [{ username: u.username, isActive: true, isEditable: false }] : undefined,
-    hasUsername: Boolean(u.username),
-    phoneNumber: u.phone ?? "",
+    phoneNumber: u.phone ?? undefined,
     isBot: Boolean(u.is_bot),
     isSelf: u.id === "user-1",
-    photoUrl: hasPhoto ? `/api/avatar/${u.id}.jpg` : undefined,
-    avatarPhotoId: hasPhoto ? String(u.id) : undefined,
+
+    photoUrl: u.photo
+      ? `/api/avatar/${u.id}.jpg`
+      : undefined,
+
+    avatarPhotoId: u.photo ? String(u.id) : undefined,
   };
 }
 
