@@ -46,6 +46,32 @@ export async function handleTelegramUpdate(update) {
     });
   }
 
+  try {
+  const photos = await telegram.call("getUserProfilePhotos", {
+    user_id: Number(senderId),
+    limit: 1,
+  });
+
+  const fileId = photos.photos?.[0]?.[0]?.file_id;
+
+  if (fileId) {
+    const file = await telegram.call("getFile", {
+      file_id: fileId,
+    });
+
+    await supabase
+      .from("tg_users")
+      .update({
+        avatar_file_id: fileId,
+        avatar_path: file.file_path,
+        avatar_updated_at: new Date().toISOString(),
+      })
+      .eq("id", senderId);
+  }
+} catch (e) {
+  console.error("Avatar fetch failed", e);
+}
+
   await supabase.from("tg_chats").upsert({
     id: chatId,
     title: msg.chat.title || msg.chat.first_name || msg.chat.username || "Chat",
