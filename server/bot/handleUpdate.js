@@ -1,8 +1,6 @@
 import { supabase } from "../lib/supabase.js";
 import { telegram } from "../lib/telegram.js";
 
-const AVATAR_BUCKET = "telegram-avatars";
-
 function msgFromUpdate(update) {
   return (
     update.message ||
@@ -53,42 +51,20 @@ async function saveTelegramAvatar(senderId) {
     }
 
     const buffer = Buffer.from(await imgRes.arrayBuffer());
- const contentType = "image/jpeg";
-const storagePath = `${senderId}.jpg`;
-    const ext = contentType.includes("png") ? "png" : "jpg";
-
-const { error: uploadError } = await supabase.storage
-  .from(AVATAR_BUCKET)
-  .upload(storagePath, buffer, {
-    contentType: "image/jpeg",
-    upsert: true,
-  });
-
-  console.log({
-  contentType,
-  bufferType: buffer.constructor.name,
-  bufferLength: buffer.length,
-});
-
-    if (uploadError) {
-      console.error("[AVATAR] upload failed", uploadError);
-      return;
-    }
-    
-    const { data: publicUrlData } = supabase.storage
-      .from(AVATAR_BUCKET)
-      .getPublicUrl(storagePath);
+    const base64 = buffer.toString("base64");
+    const dataUrl = `data:image/jpeg;base64,${base64}`;
 
     await supabase
       .from("tg_users")
       .update({
         avatar_file_id: fileId,
-        avatar_path: publicUrlData.publicUrl,
+        avatar_path: null,
+        photo: dataUrl,
         avatar_updated_at: new Date().toISOString(),
       })
       .eq("id", String(senderId));
 
-    console.log("[AVATAR] saved", senderId, publicUrlData.publicUrl);
+    console.log("[AVATAR] saved as base64", senderId);
   } catch (e) {
     console.error("[AVATAR] failed", e);
   }

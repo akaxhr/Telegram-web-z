@@ -120,7 +120,7 @@ function normalizeUserRow(u) {
     username: u.username ?? undefined,
     isSelf: Boolean(u.is_self ?? u.isSelf),
     avatarPhotoId: u.avatar_path || u.avatar_file_id || undefined,
-    photoUrl: u.avatar_path || undefined,
+    photoUrl: u.photo || u.avatar_path || undefined,
   };
 }
 
