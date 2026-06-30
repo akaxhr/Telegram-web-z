@@ -1960,7 +1960,12 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     setGlobal(global);
   } : undefined;
 
-  await callApi('sendMessage', params, progressCallback);
+  const localMessage = await callApi('sendMessageLocal', params);
+
+   await callApi('sendMessage', {
+  ...params,
+  localMessage,
+  }, progressCallback);
   
   // Do NOT reload viewport here.
   // Real Telegram-style animation must come from local optimistic message + update replacement.
