@@ -22,17 +22,21 @@ export default async function handler(req, res) {
 
   const buffer = Buffer.from(await img.arrayBuffer());
 
-  // 1. DYNAMICALLY DETECT TYPE FROM TELEGRAM PATH
-  // Telegram paths usually end in .jpg or .png (e.g., "photos/file_0.jpg")
-  let contentType = "image/jpeg"; // safe fallback
+  // 1. Force the content type explicitly based on the extension
+  let contentType = "image/jpeg";
   if (data.avatar_path.toLowerCase().endsWith(".png")) {
     contentType = "image/png";
   }
 
-  // 2. EXPLICITLY FORCE THE BROWSER TO DISPLAY IT INLINE
+  // 2. Set headers cleanly
   res.setHeader("Content-Type", contentType);
-  res.setHeader("Cache-Control", "public, max-age=86400");
+  res.setHeader("Content-Length", buffer.length); // Tells the browser exactly how much data to expect
   res.setHeader("Content-Disposition", "inline");
+  
+  // 3. TEMPORARILY DISABLE CACHE: This stops your browser from using the old "download" instructions
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
 
-  return res.status(200).send(buffer);
+  // 4. Use res.end(buffer) instead of res.send(buffer) 
+  // This guarantees Node treats it as a raw binary image chunk instead of a generic object/string
+  return res.status(200).end(buffer);
 }
