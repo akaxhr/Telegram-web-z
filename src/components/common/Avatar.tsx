@@ -130,6 +130,7 @@ const Avatar = ({
   const videoLoopCountRef = useRef(0);
   const isCustomPeer = peer && 'isCustomPeer' in peer;
   const realPeer = peer && !isCustomPeer ? peer : undefined;
+  const customPhotoUrl = (realPeer as any)?.photoUrl;
   const user = realPeer && isApiPeerUser(realPeer) ? realPeer : undefined;
   const chat = realPeer && isApiPeerChat(realPeer) ? realPeer : undefined;
   const isDeleted = user && isDeletedUser(user);
@@ -186,11 +187,16 @@ const Avatar = ({
 
     return undefined;
   }, [isCustomPeer, isSavedMessages, isDeleted, isReplies, isAnonymousForwards, peer, isSavedDialog]);
-
+console.log("[AVATAR]", {
+  peerId: realPeer?.id,
+  customPhotoUrl: customPhotoUrl?.slice?.(0, 40),
+  imgBlobUrl,
+  previewUrl,
+});
   const imgBlobUrl = useMedia(imageHash, false, ApiMediaFormat.BlobUrl);
   const videoBlobUrl = useMedia(videoHash, !shouldLoadVideo, ApiMediaFormat.BlobUrl);
-  const imgUrl = imgBlobUrl || previewUrl;
-  const hasBlobUrl = Boolean(imgUrl || videoBlobUrl);
+  const imgUrl = imgBlobUrl || customPhotoUrl || previewUrl;
+  const hasBlobUrl = Boolean(imgUrl || videoBlobUrl || customPhotoUrl);
   // `videoBlobUrl` can be taken from memory cache, so we need to check `shouldLoadVideo` again
   const shouldPlayVideo = Boolean(videoBlobUrl && shouldLoadVideo);
 
