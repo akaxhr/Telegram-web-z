@@ -101,6 +101,7 @@ export async function handleTelegramUpdate(update) {
     title: msg.chat.title || msg.chat.first_name || msg.chat.username || "Chat",
     type: msg.chat.type,
     raw: msg.chat,
+    accent_color_id: msg.chat.accent_color_id ?? null,
     updated_at: new Date().toISOString(),
   });
 

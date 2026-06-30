@@ -39,6 +39,11 @@ function mapChat(c) {
       : undefined,
 
     hasUsername: Boolean(c.username),
+
+    color: {
+  type: "regular",
+  color: Number(c.accent_color_id ?? Math.abs(Number(c.id)) % 7),
+},
   };
 }
 
@@ -58,6 +63,11 @@ function mapUser(u) {
       : undefined,
 
     avatarPhotoId: u.photo ? String(u.id) : undefined,
+
+    color: {
+  type: "regular",
+  color: Number(u.accent_color_id ?? Math.abs(Number(u.id)) % 7),
+},
   };
 }
 
