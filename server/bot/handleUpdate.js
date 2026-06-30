@@ -1,6 +1,8 @@
 import { supabase } from "../lib/supabase.js";
 import { telegram } from "../lib/telegram.js";
 
+const AVATAR_BUCKET = "telegram-avatars";
+
 function msgFromUpdate(update) {
   return (
     update.message ||
@@ -24,6 +26,68 @@ function contentFromMessage(msg) {
   };
 }
 
+async function saveTelegramAvatar(senderId) {
+  try {
+    if (!senderId) return;
+
+    const photos = await telegram.call("getUserProfilePhotos", {
+      user_id: Number(senderId),
+      limit: 1,
+    });
+
+    const fileId = photos.photos?.[0]?.[0]?.file_id;
+    if (!fileId) return;
+
+    const file = await telegram.call("getFile", {
+      file_id: fileId,
+    });
+
+    if (!file?.file_path) return;
+
+    const tgUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${file.file_path}`;
+    const imgRes = await fetch(tgUrl);
+
+    if (!imgRes.ok) {
+      console.error("[AVATAR] download failed", imgRes.status);
+      return;
+    }
+
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+    const ext = contentType.includes("png") ? "png" : "jpg";
+    const storagePath = `${senderId}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(AVATAR_BUCKET)
+      .upload(storagePath, buffer, {
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("[AVATAR] upload failed", uploadError);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(AVATAR_BUCKET)
+      .getPublicUrl(storagePath);
+
+    await supabase
+      .from("tg_users")
+      .update({
+        avatar_file_id: fileId,
+        avatar_path: publicUrlData.publicUrl,
+        avatar_updated_at: new Date().toISOString(),
+      })
+      .eq("id", String(senderId));
+
+    console.log("[AVATAR] saved", senderId, publicUrlData.publicUrl);
+  } catch (e) {
+    console.error("[AVATAR] failed", e);
+  }
+}
+
 export async function handleTelegramUpdate(update) {
   const msg = msgFromUpdate(update);
 
@@ -42,39 +106,13 @@ export async function handleTelegramUpdate(update) {
       first_name: from.first_name || "",
       last_name: from.last_name || "",
       username: from.username || null,
+      is_bot: Boolean(from.is_bot),
       raw: from,
       updated_at: new Date().toISOString(),
     });
+
+    await saveTelegramAvatar(senderId);
   }
-console.log("[AVATAR] senderId", senderId);
-
-  try {
-  const photos = await telegram.call("getUserProfilePhotos", {
-    user_id: Number(senderId),
-    limit: 1,
-  });
-
-  console.log("[AVATAR] photos", JSON.stringify(photos));
-
-  const fileId = photos.photos?.[0]?.[0]?.file_id;
-
-  if (fileId) {
-    const file = await telegram.call("getFile", {
-      file_id: fileId,
-    });
-
-    await supabase
-      .from("tg_users")
-      .update({
-        avatar_file_id: fileId,
-        avatar_path: file.file_path,
-        avatar_updated_at: new Date().toISOString(),
-      })
-      .eq("id", senderId);
-  }
-} catch (e) {
-  console.error("Avatar fetch failed", e);
-}
 
   await supabase.from("tg_chats").upsert({
     id: chatId,
