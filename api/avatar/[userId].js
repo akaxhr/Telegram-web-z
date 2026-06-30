@@ -22,7 +22,15 @@ export default async function handler(req, res) {
 
   const buffer = Buffer.from(await img.arrayBuffer());
 
-  res.setHeader("Content-Type", img.headers.get("content-type") || "image/jpeg");
+  // 1. DYNAMICALLY DETECT TYPE FROM TELEGRAM PATH
+  // Telegram paths usually end in .jpg or .png (e.g., "photos/file_0.jpg")
+  let contentType = "image/jpeg"; // safe fallback
+  if (data.avatar_path.toLowerCase().endsWith(".png")) {
+    contentType = "image/png";
+  }
+
+  // 2. EXPLICITLY FORCE THE BROWSER TO DISPLAY IT INLINE
+  res.setHeader("Content-Type", contentType);
   res.setHeader("Cache-Control", "public, max-age=86400");
   res.setHeader("Content-Disposition", "inline");
 
