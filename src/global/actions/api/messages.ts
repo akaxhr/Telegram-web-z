@@ -1985,6 +1985,8 @@ console.log('[SEND AFTER API]');
   }
 }
 
+}
+
 async function sendMessagesWithNotification<T extends GlobalState>(
   global: T,
   sendParams: SendMessageParams[],
