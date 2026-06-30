@@ -457,6 +457,17 @@ export const messageRoutes = {
   limit: 1,
 });
 
+
+console.log('[SEND 1] before local');
+
+const localMessage = await callApi('sendMessageLocal', params);
+
+console.log('[SEND 2] localMessage', localMessage);
+
+console.log('[SEND 3] before backend');
+
+
+console.log('[SEND 4] backend result', result);
 const fileId = photos.photos?.[0]?.[0]?.file_id;
 
 if (fileId) {
@@ -480,20 +491,7 @@ if (fileId) {
     entities: [],
   },
 };
-console.log('[SEND 1] before local');
 
-const localMessage = await callApi('sendMessageLocal', params);
-
-console.log('[SEND 2] localMessage', localMessage);
-
-console.log('[SEND 3] before backend');
-
-const result: any = await callApi('sendMessage', {
-  ...params,
-  localMessage,
-}, progressCallback);
-
-console.log('[SEND 4] backend result', result);
 const { data: inserted, error } = await supabase
   .from("tg_messages")
   .insert({
