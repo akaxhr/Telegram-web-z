@@ -195,8 +195,8 @@ console.groupEnd();
 
   const imgBlobUrl = useMedia(imageHash, false, ApiMediaFormat.BlobUrl);
   const videoBlobUrl = useMedia(videoHash, !shouldLoadVideo, ApiMediaFormat.BlobUrl);
-  const imgUrl = imgBlobUrl || customPhotoUrl || previewUrl;
-  const hasBlobUrl = Boolean(imgUrl || videoBlobUrl || customPhotoUrl);
+  const imgUrl = imgBlobUrl || previewUrl;
+const hasBlobUrl = Boolean(imgUrl || videoBlobUrl);
   // `videoBlobUrl` can be taken from memory cache, so we need to check `shouldLoadVideo` again
   const shouldPlayVideo = Boolean(videoBlobUrl && shouldLoadVideo);
 
@@ -239,45 +239,44 @@ console.groupEnd();
     />
   );
 } else if (hasBlobUrl) {
-  } else if (hasBlobUrl) {
-    content = (
-      <>
-        <img
-          ref={mediaRef}
-          src={imgUrl}
-          className={buildClassName(cn.media, 'avatar-media', videoBlobUrl && 'poster')}
-          alt={author}
-          decoding="async"
+  content = (
+    <>
+      <img
+        ref={mediaRef}
+        src={imgUrl}
+        className={buildClassName(cn.media, 'avatar-media', videoBlobUrl && 'poster')}
+        alt={author}
+        decoding="async"
+        draggable={false}
+      />
+      {shouldPlayVideo && (
+        <OptimizedVideo
+          canPlay
+          src={videoBlobUrl}
+          className={buildClassName(cn.media, 'avatar-media', 'poster')}
+          muted
+          loop={loopIndefinitely}
+          autoPlay
+          disablePictureInPicture
+          playsInline
           draggable={false}
+          onEnded={handleVideoEnded}
         />
-        {shouldPlayVideo && (
-          <OptimizedVideo
-            canPlay
-            src={videoBlobUrl}
-            className={buildClassName(cn.media, 'avatar-media', 'poster')}
-            muted
-            loop={loopIndefinitely}
-            autoPlay
-            disablePictureInPicture
-            playsInline
-            draggable={false}
-            onEnded={handleVideoEnded}
-          />
-        )}
-      </>
-    );
-  } else if (user) {
-    const userFullName = getUserFullName(user);
-    content = userFullName ? getFirstLetters(userFullName, 2) : undefined;
-  } else if (chat) {
-    const title = getChatTitle(lang, chat);
-    content = title && getFirstLetters(title, isUserId(chat.id) ? 2 : 1);
-  } else if (isCustomPeer) {
-    const title = peer.title || lang(peer.titleKey!);
-    content = title && getFirstLetters(title, 1);
-  } else if (text) {
-    content = getFirstLetters(text, 2);
-  }
+      )}
+    </>
+  );
+} else if (user) {
+  const userFullName = getUserFullName(user);
+  content = userFullName ? getFirstLetters(userFullName, 2) : undefined;
+} else if (chat) {
+  const title = getChatTitle(lang, chat);
+  content = title && getFirstLetters(title, isUserId(chat.id) ? 2 : 1);
+} else if (isCustomPeer) {
+  const title = peer.title || lang(peer.titleKey!);
+  content = title && getFirstLetters(title, 1);
+} else if (text) {
+  content = getFirstLetters(text, 2);
+}
 
   const isRoundedRect = (isCustomPeer && peer.isAvatarSquare)
     || (isForum && !((withStory || withStorySolid) && realPeer?.hasStories));
