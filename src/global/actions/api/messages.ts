@@ -1939,6 +1939,7 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
 
 
 async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
+  // @optimization
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
@@ -1959,25 +1960,11 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     setGlobal(global);
   } : undefined;
 
-  console.log('[SEND 1] before local');
-
-console.log('[SEND 2] localMessage', localMessage);
-
-console.log('[SEND 3] before backend');
-
-const result: any = await callApi('sendMessage', {
-  ...params,
-  localMessage,
-}, progressCallback);
-
-console.log('[SEND 4] backend result', result);
-
   const localMessage = await callApi('sendMessageLocal', params);
 
-  await callApi('sendMessage', {
-    ...params,
-    localMessage,
-  }, progressCallback);
+  if (localMessage) {
+    await callApi('sendApiMessage', params, localMessage, progressCallback);
+  }
 
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
