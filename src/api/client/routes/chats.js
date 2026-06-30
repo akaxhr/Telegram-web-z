@@ -52,6 +52,12 @@ function mapUser(u) {
     phoneNumber: u.phone ?? undefined,
     isBot: Boolean(u.is_bot),
     isSelf: u.id === "user-1",
+
+    photoUrl: u.photo
+      ? `/api/avatar/${u.id}.jpg`
+      : undefined,
+
+    avatarPhotoId: u.photo ? String(u.id) : undefined,
   };
 }
 
@@ -112,6 +118,31 @@ export const chatRoutes = {
     if (error) throw error;
 
     const chats = (chatRows ?? []).map(mapChat);
+    const privateIds = chats
+  .filter((c) => c.type === "chatTypePrivate")
+  .map((c) => c.id);
+
+const { data: userRows, error: userError } = await supabase
+  .from("tg_users")
+  .select("*")
+  .in("id", privateIds);
+
+if (userError) throw userError;
+
+const users = (userRows ?? []).map(mapUser);
+
+const userMap = Object.fromEntries(
+  users.map((u) => [u.id, u])
+);
+
+for (const chat of chats) {
+  const user = userMap[chat.id];
+
+  if (user) {
+    chat.photoUrl = user.photoUrl;
+    chat.avatarPhotoId = user.avatarPhotoId;
+  }
+}
     const chatIds = chats.map((c) => c.id);
 
     const lastRows = await getLastMessages(chatIds);
@@ -125,7 +156,7 @@ export const chatRoutes = {
     return {
       chatIds,
       chats,
-      users: [],
+      users,
       userStatusesById: {},
       draftsById: {},
       orderedPinnedIds: chats.filter((c) => c.isPinned).map((c) => c.id),
