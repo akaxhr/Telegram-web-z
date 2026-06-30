@@ -215,14 +215,25 @@ const Avatar = ({
   const author = user ? getUserFullName(user) : (chat ? getChatTitle(lang, chat) : text);
 
   if (specialIcon) {
-    content = (
-      <Icon
-        name={specialIcon}
-        className={cn.icon}
-        role="img"
-        ariaLabel={author}
-      />
-    );
+  content = (
+    <Icon
+      name={specialIcon}
+      className={cn.icon}
+      role="img"
+      ariaLabel={author}
+    />
+  );
+} else if (customPhotoUrl) {
+  content = (
+    <img
+      src={customPhotoUrl}
+      className={buildClassName(cn.media, 'avatar-media')}
+      alt={author || ''}
+      decoding="async"
+      draggable={false}
+    />
+  );
+} else if (hasBlobUrl) {
   } else if (hasBlobUrl) {
     content = (
       <>
