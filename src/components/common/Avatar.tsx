@@ -45,7 +45,7 @@ import Icon from './icons/Icon';
 import './Avatar.scss';
 
 const LOOP_COUNT = 3;
-
+console.log("[AVATAR PEER]", realPeer);
 export const AVATAR_SIZES = {
   micro: REM,
   mini: 1.5 * REM,
