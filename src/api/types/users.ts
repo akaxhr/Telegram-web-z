@@ -32,6 +32,7 @@ export interface ApiUser {
   hasVideoAvatar?: boolean;
   avatarPhotoId?: string;
   botPlaceholder?: string;
+  photoUrl?: string;
   canBeInvitedToGroup?: boolean;
   fakeType?: ApiFakeType;
   isAttachBot?: boolean;

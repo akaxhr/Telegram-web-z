@@ -72,6 +72,7 @@ const ProfilePhoto = ({
   const isRepliesChat = chat && isChatWithRepliesBot(chat.id);
   const isAnonymousForwards = chat && isAnonymousForwardsChat(chat.id);
   const peer = (user || chat)!;
+  const customPhotoUrl = user?.photoUrl || (chat as any)?.photoUrl;
   const canHaveMedia = peer && !isSavedMessages && !isDeleted && !isRepliesChat && !isAnonymousForwards;
   const { isVideo } = photo || {};
 
@@ -128,7 +129,16 @@ const ProfilePhoto = ({
 
   if (specialIcon) {
     content = <Icon name={specialIcon} role="img" />;
-  } else if (hasMedia) {
+  } else if (customPhotoUrl) {
+  content = (
+    <img
+      src={customPhotoUrl}
+      draggable={false}
+      className="avatar-media custom-avatar"
+      alt=""
+    />
+  );
+} else if (hasMedia) {
     content = (
       <>
         {isBlurredThumb ? (

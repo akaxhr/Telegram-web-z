@@ -119,6 +119,8 @@ function normalizeUserRow(u) {
     lastName: u.last_name ?? u.lastName ?? "",
     username: u.username ?? undefined,
     isSelf: Boolean(u.is_self ?? u.isSelf),
+    avatarPhotoId: u.avatar_path || u.avatar_file_id || undefined,
+    photoUrl: u.avatar_path ? `/api/avatar/${u.id}` : undefined,
   };
 }
 
@@ -436,6 +438,28 @@ export const messageRoutes = {
     username: sent.from?.username || "acarthub_bot",
     is_bot: true,
   }, { onConflict: "id" });
+
+  const photos = await telegram.call("getUserProfilePhotos", {
+  user_id: Number(senderId),
+  limit: 1,
+});
+
+const fileId = photos.photos?.[0]?.[0]?.file_id;
+
+if (fileId) {
+  const file = await telegram.call("getFile", {
+    file_id: fileId,
+  });
+
+  await supabase
+    .from("tg_users")
+    .update({
+      avatar_file_id: fileId,
+      avatar_path: file.file_path,
+      avatar_updated_at: new Date().toISOString(),
+    })
+    .eq("id", senderId);
+}
 
   const apiContent = {
   text: {
