@@ -120,7 +120,7 @@ function normalizeUserRow(u) {
     username: u.username ?? undefined,
     isSelf: Boolean(u.is_self ?? u.isSelf),
     avatarPhotoId: u.avatar_path || u.avatar_file_id || undefined,
-    photoUrl: u.photo || u.avatar_path || undefined,
+    photoUrl: u.photo ? `/api/avatar/${u.id}.jpg` : undefined,
   };
 }
 
@@ -138,7 +138,7 @@ function normalizeChatRow(c) {
     isArchived: Boolean(c.is_archived ?? c.isArchived),
     isForum: Boolean(c.is_forum ?? c.isForum),
     withForumTabs: Boolean(c.with_forum_tabs ?? c.withForumTabs),
-    photoUrl: c.photo || c.avatar_path || undefined,
+    photoUrl: c.photo ? `/api/avatar/${c.id}.jpg` : undefined,
     avatarPhotoId: c.avatar_path || c.avatar_file_id || undefined,
   };
 }
