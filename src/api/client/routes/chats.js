@@ -43,6 +43,7 @@ function mapChat(c) {
     hasUsername: Boolean(c.username),
 
 color: { type: "regular",color: colorId },
+  };
 }
 
 function mapUser(u) {
