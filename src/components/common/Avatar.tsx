@@ -139,8 +139,8 @@ const Avatar = ({
   const isForum = chat?.isForum;
 console.group("===== AVATAR =====");
 
-console.log(Avatar);
-
+console.log("user:", user);
+console.log("chat:", chat);
 
 console.groupEnd();
   const peerColorKey = getPeerColorKey(peer, true);
