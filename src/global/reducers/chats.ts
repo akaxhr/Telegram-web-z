@@ -28,6 +28,8 @@ export function replaceChatListIds<T extends GlobalState>(
     newIds,
     global.chats.listIds,
   );
+  console.log("USERS", result.users);
+console.log("CHATS", result.chats);
 
   return {
     ...global,

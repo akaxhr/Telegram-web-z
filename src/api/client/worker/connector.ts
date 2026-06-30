@@ -240,6 +240,8 @@ if (methodMap[String(fnName)]) {
   if (acarthubMethods.has(String(fnName))) {
     const result = await callApiClient(String(fnName), args[0]);
     console.log('[ACARTHUB API]', fnName, result);
+    console.log("USERS", result.users);
+    console.log("CHATS", result.chats);
     return result as unknown as Awaited<MethodResponse<T>>;
   }
 
