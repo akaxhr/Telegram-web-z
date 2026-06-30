@@ -42,21 +42,21 @@ hasUsername: Boolean(u.username),
 }
 
 function mapUser(u) {
+  const hasPhoto = Boolean(u.photo);
+
   return {
     id: String(u.id),
     type: "userTypeRegular",
     firstName: u.first_name ?? "",
     lastName: u.last_name ?? "",
     username: u.username ?? undefined,
-    phoneNumber: u.phone ?? undefined,
+    usernames: u.username ? [{ username: u.username, isActive: true, isEditable: false }] : undefined,
+    hasUsername: Boolean(u.username),
+    phoneNumber: u.phone ?? "",
     isBot: Boolean(u.is_bot),
     isSelf: u.id === "user-1",
-
-    photoUrl: u.photo
-      ? `/api/avatar/${u.id}.jpg`
-      : undefined,
-
-    avatarPhotoId: u.photo ? String(u.id) : undefined,
+    photoUrl: hasPhoto ? `/api/avatar/${u.id}.jpg` : undefined,
+    avatarPhotoId: hasPhoto ? String(u.id) : undefined,
   };
 }
 
