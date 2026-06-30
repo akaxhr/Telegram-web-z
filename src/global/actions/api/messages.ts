@@ -1939,14 +1939,11 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
 
 
 async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
-  // @optimization
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
 
-  if (!params.chat) {
-    return;
-  }
+  if (!params.chat) return;
 
   let currentMessageKey: MessageKey | undefined;
   const progressCallback = params.attachment ? (progress: number, messageKey: MessageKey) => {
@@ -1970,7 +1967,6 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     global = getGlobal();
     global = updateUploadByMessageKey(global, currentMessageKey, undefined);
     setGlobal(global);
-
     uploadProgressCallbacks.delete(currentMessageKey);
   }
 }

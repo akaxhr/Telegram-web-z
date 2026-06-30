@@ -504,15 +504,7 @@ if (error) throw error;
 await touchChat(chatId, inserted.id);
 
 return {
-  localId,
-  message: {
-    id: inserted.id,
-    chatId,
-    senderId,
-    date: inserted.date,
-    content: inserted.content,
-    isOutgoing: true,
-  },
+  message: normalizeMessageRow(inserted),
 };
   },
   
