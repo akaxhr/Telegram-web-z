@@ -68,6 +68,15 @@ async function saveTelegramAvatar(senderId) {
       console.error("[AVATAR] upload failed", uploadError);
       return;
     }
+    
+    console.log("[AVATAR] fileId", fileId);
+console.log("[AVATAR] file", file);
+
+console.log("[AVATAR] download", imgRes.status, imgRes.headers.get("content-type"));
+
+console.log("[AVATAR] uploading to", storagePath);
+
+console.log("[AVATAR] uploadError", uploadError);
 
     const { data: publicUrlData } = supabase.storage
       .from(AVATAR_BUCKET)
