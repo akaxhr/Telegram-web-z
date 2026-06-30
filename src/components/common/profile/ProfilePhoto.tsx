@@ -73,6 +73,15 @@ const ProfilePhoto = ({
   const isAnonymousForwards = chat && isAnonymousForwardsChat(chat.id);
   const peer = (user || chat)!;
   const customPhotoUrl = user?.photoUrl || (chat as any)?.photoUrl;
+
+  console.log('[PROFILE PHOTO]', {
+  userId: user?.id,
+  chatId: chat?.id,
+  userPhoto: user?.photoUrl?.slice?.(0, 30),
+  chatPhoto: (chat as any)?.photoUrl?.slice?.(0, 30),
+  customPhoto: customPhotoUrl?.slice?.(0, 30),
+});
+
   const canHaveMedia = peer && !isSavedMessages && !isDeleted && !isRepliesChat && !isAnonymousForwards;
   const { isVideo } = photo || {};
 
