@@ -1927,14 +1927,7 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
   sendParams: SendMessageParams,
   localMessages: SendMessageParams[],
 ) {
-  const message = await callApi('sendMessageLocal', sendParams);
-
-  if (message) {
-    await sendMessage(global, {
-      ...sendParams,
-      localMessage: message,
-    });
-  }
+  await sendMessage(global, sendParams);
 }
 
 
@@ -1957,11 +1950,11 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     setGlobal(global);
   } : undefined;
 
-  const localMessage = await callApi('sendMessageLocal', params);
+ const localMessage = await callApi('sendMessageLocal', params);
 
-  if (localMessage) {
-    await callApi('sendApiMessage', params, localMessage, progressCallback);
-  }
+if (localMessage) {
+  await callApi('sendApiMessage', params, localMessage, progressCallback);
+}
 
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
