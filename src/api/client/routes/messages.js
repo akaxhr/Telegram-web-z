@@ -421,6 +421,7 @@ export const messageRoutes = {
   async "messages.sendMessage"(payload) {
   const chatId = String(payload.chat?.id || payload.chatId);
   const text = payload.text || payload.message || "";
+  const localId = payload.localMessage?.id;
 
   const sent = await telegram.sendMessage({
     chat_id: chatId,
@@ -463,6 +464,7 @@ if (error) throw error;
 await touchChat(chatId, inserted.id);
 
 return {
+  localId,
   message: {
     id: inserted.id,
     chatId,

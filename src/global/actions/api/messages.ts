@@ -1967,6 +1967,7 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
   localMessage,
   }, progressCallback);
   
+  console.log('[SEND RESULT]', result);
   // Do NOT reload viewport here.
   // Real Telegram-style animation must come from local optimistic message + update replacement.
 
