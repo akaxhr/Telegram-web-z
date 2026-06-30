@@ -1219,6 +1219,7 @@ addActionHandler('sendMessageAction', async (global, actions, payload): Promise<
   if (global.connectionState !== 'connectionStateReady') return;
   if (selectIsChatWithSelf(global, chatId)) return;
 
+  
   const chat = selectChat(global, chatId)!;
   if (!chat || chat.isMonoforum) return;
   const user = selectUser(global, chatId);
@@ -1228,6 +1229,8 @@ addActionHandler('sendMessageAction', async (global, actions, payload): Promise<
     peer: chat, threadId, action,
   });
 });
+
+
 
 addActionHandler('reportChannelSpam', (global, actions, payload): ActionReturnType => {
   const { participantId, chatId, messageIds } = payload;
@@ -1955,6 +1958,19 @@ async function sendMessage<T extends GlobalState>(global: T, params: SendMessage
     global = updateUploadByMessageKey(global, messageKey, progress);
     setGlobal(global);
   } : undefined;
+
+  console.log('[SEND 1] before local');
+
+console.log('[SEND 2] localMessage', localMessage);
+
+console.log('[SEND 3] before backend');
+
+const result: any = await callApi('sendMessage', {
+  ...params,
+  localMessage,
+}, progressCallback);
+
+console.log('[SEND 4] backend result', result);
 
   const localMessage = await callApi('sendMessageLocal', params);
 

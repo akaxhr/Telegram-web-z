@@ -435,15 +435,6 @@ export const messageRoutes = {
 
   async "messages.sendMessage"(payload) {
 
-    console.log('[SEND 1] before local');
-
-const localMessage = await callApi('sendMessageLocal', params);
-
-console.log('[SEND 2] localMessage', localMessage);
-
-console.log('[SEND 3] before backend');
-
-console.log('[SEND 4] backend result', result);
   const chatId = String(payload.chat?.id || payload.chatId);
   const text = payload.text || payload.message || "";
   const localId = payload.localMessage?.id;
