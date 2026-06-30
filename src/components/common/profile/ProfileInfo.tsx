@@ -171,6 +171,13 @@ const ProfileInfo = ({
   const collectibleEmojiStatus = emojiStatus?.type === 'collectible' ? emojiStatus : undefined;
 
   const peer = user || chat;
+
+const peerWithPhoto = peer ? {
+  ...peer,
+  photoUrl: (peer as any).photoUrl || user?.photoUrl || (chat as any)?.photoUrl,
+  avatarPhotoId: (peer as any).avatarPhotoId || user?.avatarPhotoId || (chat as any)?.avatarPhotoId,
+} : undefined;
+
   const { customEmoji: backgroundEmoji } = useCustomEmoji(
     collectibleEmojiStatus?.patternDocumentId || peer?.profileColor?.backgroundEmojiId,
   );
