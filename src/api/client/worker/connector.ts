@@ -196,6 +196,7 @@ export async function callApi<T extends keyof Methods>(
   fetchMessage: "messages.fetchMessage",
   fetchRichMessage: "messages.fetchRichMessage",
   fetchMessagesById: "messages.fetchMessagesByIds",
+  sendMessageLocal: "messages.sendMessageLocal",
 
   sendMessage: "messages.sendMessage",
   editMessage: "messages.editMessage",
