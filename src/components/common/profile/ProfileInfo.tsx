@@ -191,7 +191,7 @@ const peerWithPhoto = peer ? {
     }
 console.group("===== PROFILE INFO =====");
 
-console.log("peerId:", peerId);
+console.log("peerId:", ProfileInfo);
 
 console.log("USER:", user);
 console.log("CHAT:", chat);
