@@ -45,7 +45,7 @@ import Icon from './icons/Icon';
 import './Avatar.scss';
 
 const LOOP_COUNT = 3;
-console.log("[AVATAR PEER]", realPeer);
+
 export const AVATAR_SIZES = {
   micro: REM,
   mini: 1.5 * REM,
@@ -137,7 +137,7 @@ const Avatar = ({
   const isReplies = realPeer && isChatWithRepliesBot(realPeer.id);
   const isAnonymousForwards = realPeer && isAnonymousForwardsChat(realPeer.id);
   const isForum = chat?.isForum;
-
+console.log("[AVATAR PEER]", realPeer);
   const peerColorKey = getPeerColorKey(peer, true);
   const peerColorClass = peerColorKey !== undefined ? getPeerColorClass(peerColorKey) : undefined;
 
