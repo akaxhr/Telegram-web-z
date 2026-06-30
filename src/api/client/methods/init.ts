@@ -20,9 +20,13 @@ return Promise.resolve();
 }
 
 export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<T>): MethodResponse<T> {
-  console.log('Worker skipped:', fnName);
+  const method = methods[fnName] as ((...args: MethodArgs<T>) => MethodResponse<T>) | undefined;
 
-  switch (fnName) {
+  if (method) {
+    return method(...args);
+  }
+
+  switch (String(fnName)) {
     case 'loadAllChats':
     case 'loadConfig':
     case 'loadAppConfig':
@@ -30,6 +34,7 @@ export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<
       return true as MethodResponse<T>;
 
     default:
+      console.warn('Worker method missing:', fnName);
       return undefined as MethodResponse<T>;
   }
 }
