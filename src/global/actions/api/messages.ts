@@ -1933,38 +1933,28 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
 }
 
 
-async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
-  console.log('[INNER SENDMESSAGE FIRED]', params);
-
-if (!params) {
-  console.log('[SEND STOP] params undefined');
-  return;
-}
-  if (params.replyInfo || IS_IOS) {
-    await rafPromise();
-  }
 async function sendMessage<T extends GlobalState>(
   global: T,
   params: SendMessageParams,
 ) {
-  console.log('[INNER SENDMESSAGE FIRED]', params);
+  console.log('[INNER PARAMS CHECK]', params);
+
+  if (!params) {
+    console.error('[SEND STOP] params is undefined');
+    return;
+  }
 
   if (params.replyInfo || IS_IOS) {
-    console.log('[SEND WAIT RAF]');
     await rafPromise();
   }
 
   if (!params.chat) {
-    console.log('[SEND STOP] params.chat missing', params);
+    console.error('[SEND STOP] chat missing', params);
     return;
   }
 
-  console.log('[SEND BEFORE LOCAL]');
-
-  // Leave the rest of your code unchanged for now.
-  if (!params.chat) return;
-
   let currentMessageKey: MessageKey | undefined;
+
   const progressCallback = params.attachment ? (progress: number, messageKey: MessageKey) => {
     if (!uploadProgressCallbacks.has(messageKey)) {
       currentMessageKey = messageKey;
@@ -1975,22 +1965,26 @@ async function sendMessage<T extends GlobalState>(
     global = updateUploadByMessageKey(global, messageKey, progress);
     setGlobal(global);
   } : undefined;
-console.log('[SEND CALLING LOCAL]');
- const localMessage = await callApi('sendMessageLocal', params);
-console.log('[SEND AFTER LOCAL]', localMessage);
-console.log('[SEND BEFORE API]');
-if (localMessage) {
+
+  console.log('[SEND BEFORE LOCAL]');
+  const localMessage = await callApi('sendMessageLocal', params);
+  console.log('[SEND AFTER LOCAL]', localMessage);
+
+  if (!localMessage) {
+    console.error('[SEND STOP] localMessage undefined');
+    return;
+  }
+
+  console.log('[SEND BEFORE API]');
   await callApi('sendApiMessage', params, localMessage, progressCallback);
-}
-console.log('[SEND AFTER API]');
+  console.log('[SEND AFTER API]');
+
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
     global = updateUploadByMessageKey(global, currentMessageKey, undefined);
     setGlobal(global);
     uploadProgressCallbacks.delete(currentMessageKey);
   }
-}
-
 }
 
 async function sendMessagesWithNotification<T extends GlobalState>(
