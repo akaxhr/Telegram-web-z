@@ -1945,6 +1945,7 @@ async function sendMessage<T extends GlobalState>(
   }
 
   if (params.replyInfo || IS_IOS) {
+    console.log('[SEND WAIT RAF]');
     await rafPromise();
   }
 
@@ -1967,7 +1968,21 @@ async function sendMessage<T extends GlobalState>(
   } : undefined;
 
   console.log('[SEND BEFORE LOCAL]');
-  const localMessage = await callApi('sendMessageLocal', params);
+
+  let localMessage: Awaited<ReturnType<typeof callApi<'sendMessageLocal'>>> | undefined;
+
+  try {
+    localMessage = await Promise.race([
+      callApi('sendMessageLocal', params),
+      new Promise<undefined>((_, reject) => {
+        setTimeout(() => reject(new Error('sendMessageLocal timeout')), 3000);
+      }),
+    ]);
+  } catch (err) {
+    console.error('[SEND LOCAL ERROR]', err);
+    return;
+  }
+
   console.log('[SEND AFTER LOCAL]', localMessage);
 
   if (!localMessage) {
@@ -1976,7 +1991,14 @@ async function sendMessage<T extends GlobalState>(
   }
 
   console.log('[SEND BEFORE API]');
-  await callApi('sendApiMessage', params, localMessage, progressCallback);
+
+  try {
+    await callApi('sendApiMessage', params, localMessage, progressCallback);
+  } catch (err) {
+    console.error('[SEND API ERROR]', err);
+    return;
+  }
+
   console.log('[SEND AFTER API]');
 
   if (progressCallback && currentMessageKey) {
