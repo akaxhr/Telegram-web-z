@@ -34,18 +34,17 @@ function mapChat(c) {
     membersCount: c.members_count ?? undefined,
     paidMessagesStars: c.paid_messages_stars ?? undefined,
 
-    usernames: c.username
-      ? [{ username: c.username, isActive: true, isEditable: false }]
-      : undefined,
-
-    hasUsername: Boolean(c.username),
+    usernames: u.username
+  ? [{ username: u.username, isActive: true, isEditable: false }]
+  : undefined,
+hasUsername: Boolean(u.username),
   };
 }
 
 function mapUser(u) {
   return {
     id: String(u.id),
-    type: "user",
+    type: "userTypeRegular",
     firstName: u.first_name ?? "",
     lastName: u.last_name ?? "",
     username: u.username ?? undefined,
