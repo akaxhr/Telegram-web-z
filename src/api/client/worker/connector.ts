@@ -196,7 +196,7 @@ export async function callApi<T extends keyof Methods>(
   fetchMessage: "messages.fetchMessage",
   fetchRichMessage: "messages.fetchRichMessage",
   fetchMessagesById: "messages.fetchMessagesByIds",
-  sendMessageLocal: "messages.sendMessageLocal",
+  
 
   sendMessage: "messages.sendMessage",
   editMessage: "messages.editMessage",
@@ -236,10 +236,11 @@ if (methodMap[String(fnName)]) {
   ) as unknown as Awaited<MethodResponse<T>>;
 }
 
+
   if (acarthubMethods.has(String(fnName))) {
     const result = await callApiClient(String(fnName), args[0]);
     console.log('[ACARTHUB API]', fnName, result);
-    return result as MethodResponse<T>;
+    return result as unknown as Awaited<MethodResponse<T>>;
   }
 
   const result = await makeRequest({
