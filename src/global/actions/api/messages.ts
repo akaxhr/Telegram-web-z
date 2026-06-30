@@ -325,6 +325,7 @@ addActionHandler('loadMessagesById', async (global, actions, payload): Promise<v
 });
 
 addActionHandler('sendMessage', async (global, actions, payload): Promise<void> => {
+  console.log('[ACTION SENDMESSAGE FIRED]', payload);
   const { messageList, tabId = getCurrentTabId() } = payload;
 
   const { storyId, peerId: storyPeerId } = selectCurrentViewedStory(global, tabId);
