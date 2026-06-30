@@ -137,7 +137,18 @@ const Avatar = ({
   const isReplies = realPeer && isChatWithRepliesBot(realPeer.id);
   const isAnonymousForwards = realPeer && isAnonymousForwardsChat(realPeer.id);
   const isForum = chat?.isForum;
-console.log("[AVATAR PEER]", realPeer);
+console.group("===== AVATAR =====");
+
+console.log("user:", user);
+console.log("chat:", chat);
+
+console.log("user.photoUrl:", (user as any)?.photoUrl);
+console.log("chat.photoUrl:", (chat as any)?.photoUrl);
+
+console.log("user.avatarPhotoId:", user?.avatarPhotoId);
+console.log("chat.avatarPhotoId:", chat?.avatarPhotoId);
+
+console.groupEnd();
   const peerColorKey = getPeerColorKey(peer, true);
   const peerColorClass = peerColorKey !== undefined ? getPeerColorClass(peerColorKey) : undefined;
 
