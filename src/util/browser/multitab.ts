@@ -9,7 +9,7 @@ import type { GlobalState } from '../../global/types';
 
 import { selectTabState } from '../../global/selectors';
 import {
-  callApiLocal,
+  callApi,
   cancelApiProgressMaster,
   handleMethodCallback,
   handleMethodResponse,
@@ -357,7 +357,7 @@ export function handleMessage({ data }: { data: BroadcastChannelMessage }) {
       }] : args) as MethodArgs<keyof Methods>;
 
       (async () => {
-        const result = await (callApiLocal(name, ...argsWithCallback));
+        const result = await (callApi(name, ...argsWithCallback));
 
         channel.postMessage({
           type: 'messageResponse',

@@ -30,7 +30,7 @@ import {
 } from '../../../util/sessions';
 import { forceWebsync } from '../../../util/websync';
 import {
-  callApi, callApiLocal, initApi, setShouldEnableDebugLog,
+  callApi, initApi, setShouldEnableDebugLog,
 } from '../../../api/gramjs';
 import { removeGlobalFromCache, removeSharedStateFromCache, serializeGlobal } from '../../cache';
 import {
@@ -258,11 +258,11 @@ addActionHandler('reset', (global, actions): ActionReturnType => {
 });
 
 addActionHandler('disconnect', (): ActionReturnType => {
-  void callApiLocal('disconnect');
+  void callApi('disconnect');
 });
 
 addActionHandler('destroyConnection', (): ActionReturnType => {
-  void callApiLocal('destroy', true, true);
+  void callApi('destroy', true, true);
 });
 
 addActionHandler('loadNearestCountry', async (global): Promise<void> => {
