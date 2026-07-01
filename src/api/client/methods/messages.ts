@@ -435,11 +435,144 @@ export function sendApiMessage(
 export async function sendMessage(
   params: SendMessageParams,
   onProgress?: ApiOnProgress,
-): Promise<void> {
+) {
   const localMessage = params.localMessage || await sendMessageLocal(params);
-  if (!localMessage) return;
+  return localMessage ? sendApiMessage(params, localMessage, onProgress) : undefined;
+}
 
-  await sendApiMessage(params, localMessage, onProgress);
+const groupedUploads: Record<string, {
+  counter: number;
+  singleMediaByIndex: Record<number, GramJs.InputSingleMedia>;
+  localMessages: Record<string, ApiMessage>;
+  cancelSendingStatusTimeouts: Record<string, NoneToVoidFunction>;
+}> = {};
+
+function sendGroupedMedia(
+  {
+    chat,
+    text = DEFAULT_PRIMITIVES.STRING,
+    entities,
+    replyInfo,
+    suggestedPostInfo,
+    attachment,
+    groupedId,
+    isSilent,
+    scheduledAt,
+    scheduleRepeatPeriod,
+    sendAs,
+    messagePriceInStars,
+  }: {
+    chat: ApiChat;
+    text?: string;
+    entities?: ApiMessageEntity[];
+    replyInfo?: ApiInputReplyInfo;
+    suggestedPostInfo?: ApiInputSuggestedPostInfo;
+    attachment: ApiAttachment;
+    groupedId: string;
+    isSilent?: boolean;
+    scheduledAt?: number;
+    scheduleRepeatPeriod?: number;
+    sendAs?: ApiPeer;
+    messagePriceInStars?: number;
+  },
+  randomId: GramJs.long,
+  localMessage: ApiMessage,
+  onProgress: ApiOnProgress | undefined,
+  cancelSendingStatusTimeout: NoneToVoidFunction,
+) {
+  let groupIndex = -1;
+  if (!groupedUploads[groupedId]) {
+    groupedUploads[groupedId] = {
+      counter: 0,
+      singleMediaByIndex: {},
+      localMessages: {},
+      cancelSendingStatusTimeouts: {},
+    };
+  }
+
+  groupIndex = groupedUploads[groupedId].counter++;
+
+  const prevMediaQueue = mediaQueue;
+  mediaQueue = (async () => {
+    let inputMedia: GramJs.TypeInputMedia | undefined;
+
+    if (attachment.gif) {
+      inputMedia = buildInputMediaDocument(attachment.gif, attachment.shouldSendAsSpoiler);
+    } else {
+      let media;
+      try {
+        media = await uploadMedia(localMessage, attachment, onProgress!);
+      } catch (err) {
+        if (DEBUG) {
+          // eslint-disable-next-line no-console
+          console.warn(err);
+        }
+
+        groupedUploads[groupedId].counter--;
+
+        await prevMediaQueue;
+
+        return;
+      }
+
+      inputMedia = await fetchInputMedia(
+        buildInputPeer(chat.id, chat.accessHash),
+        media,
+      );
+    }
+
+    await prevMediaQueue;
+
+    if (!inputMedia) {
+      groupedUploads[groupedId].counter--;
+
+      if (DEBUG) {
+        // eslint-disable-next-line no-console
+        console.warn('Failed to upload grouped media');
+      }
+
+      return;
+    }
+
+    groupedUploads[groupedId].singleMediaByIndex[groupIndex] = new GramJs.InputSingleMedia({
+      media: inputMedia,
+      randomId,
+      message: text,
+      entities: entities ? entities.map(buildMtpMessageEntity) : undefined,
+    });
+    groupedUploads[groupedId].localMessages[randomId.toString()] = localMessage;
+    groupedUploads[groupedId].cancelSendingStatusTimeouts[randomId.toString()] = cancelSendingStatusTimeout;
+
+    if (Object.keys(groupedUploads[groupedId].singleMediaByIndex).length < groupedUploads[groupedId].counter) {
+      return;
+    }
+
+    const { singleMediaByIndex, localMessages, cancelSendingStatusTimeouts } = groupedUploads[groupedId];
+    delete groupedUploads[groupedId];
+    const count = Object.values(singleMediaByIndex).length;
+
+    const update = await invokeRequest(new GramJs.messages.SendMultiMedia({
+      clearDraft: true,
+      peer: buildInputPeer(chat.id, chat.accessHash),
+      multiMedia: Object.values(singleMediaByIndex), // Object keys are usually ordered
+      replyTo: replyInfo && buildInputReplyTo(replyInfo),
+      ...(isSilent && { silent: isSilent }),
+      ...(scheduledAt && { scheduleDate: scheduledAt }),
+      ...(scheduleRepeatPeriod && { scheduleRepeatPeriod }),
+      ...(sendAs && { sendAs: buildInputPeer(sendAs.id, sendAs.accessHash) }),
+      ...(messagePriceInStars && { allowPaidStars: BigInt(messagePriceInStars * count) }),
+      ...(suggestedPostInfo && { suggestedPost: buildInputSuggestedPost(suggestedPostInfo) }),
+    }), {
+      shouldIgnoreUpdates: true,
+    });
+
+    if (!update) return;
+
+    Object.values(cancelSendingStatusTimeouts).forEach((cancel) => cancel());
+    handleMultipleLocalMessagesUpdate(localMessages, update);
+  })();
+
+  return mediaQueue;
 }
 
 export async function editTodo({
