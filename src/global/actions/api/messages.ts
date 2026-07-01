@@ -371,15 +371,20 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
 
   const replyInfo = storyReplyInfo || messageReplyInfo;
 
-  const threadInfo = selectThreadInfo(global, chatId!, threadId!);
-
 const listedIds = selectListedIds(global, chatId!, threadId!) || [];
-const fallbackLastMessageId = listedIds.length ? Math.max(...listedIds) : undefined;
+const viewportIds = selectViewportIds(global, chatId!, threadId!, tabId) || [];
+
+const allVisibleIds = [...listedIds, ...viewportIds].filter((id) => Number.isFinite(id));
+
+const fallbackLastMessageId = allVisibleIds.length
+  ? Math.max(...allVisibleIds)
+  : 0;
+
+const threadInfo = selectThreadInfo(global, chatId!, threadId!);
 
 const lastMessageId = threadId === MAIN_THREAD_ID
   ? selectChatLastMessageId(global, chatId!) || fallbackLastMessageId
   : threadInfo?.lastMessageId || fallbackLastMessageId;
-
   const messagePriceInStars = await getPeerStarsForMessage(global, chatId!);
 
   const suggestedPostPrice = draftSuggestedPostInfo?.price;
