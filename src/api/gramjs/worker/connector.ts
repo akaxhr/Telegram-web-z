@@ -89,25 +89,31 @@ export function initApi(onUpdate: OnApiUpdate, initialArgs: ApiInitialArgs) {
   updateCallback = onUpdate;
   isInited = true;
 
- onUpdate({ '@type': 'updateApiReady' });
+  if (!worker) {
+    console.log('[CREATING GRAMJS WORKER]');
 
-onUpdate({
-  '@type': 'updateAuthorizationState',
-  authorizationState: 'authorizationStateReady',
-});
+    worker = new Worker(new URL('./worker.ts', import.meta.url), {
+      type: 'module',
+    });
 
-  apiRequestsQueue.forEach((request) => {
-    request.deferred.resolve(undefined);
+    subscribeToWorker(onUpdate);
+  }
+
+  makeRequest({
+    type: 'initApi',
+    args: [initialArgs, savedLocalDb],
   });
-  apiRequestsQueue = [];
 
-  localApiRequestsQueue.forEach((request) => {
-    request.deferred.resolve(undefined);
+  onUpdate({ '@type': 'updateApiReady' });
+
+  onUpdate({
+    '@type': 'updateAuthorizationState',
+    authorizationState: 'authorizationStateReady',
   });
-  localApiRequestsQueue = [];
 
   return Promise.resolve();
 }
+
 export function updateLocalDb(name: keyof LocalDb, prop: string, value: any) {
   savedLocalDb[name][prop] = value;
 }
