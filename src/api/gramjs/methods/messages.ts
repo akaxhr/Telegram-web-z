@@ -149,6 +149,13 @@ type SearchResults = {
   searchFlood?: ApiSearchPostsFlood;
 };
 
+let tempLocalMessageCounter = 0;
+
+function getTempLocalMessageId() {
+  tempLocalMessageCounter += 1;
+  return -Date.now() * 1000 - tempLocalMessageCounter;
+}
+
 export async function fetchMessages({
   chat,
   threadId,
@@ -346,7 +353,7 @@ export function sendMessageLocal(
     messagePriceInStars,
     dice,
   });
-
+localMessage.id = getTempLocalMessageId();
   sendApiUpdate({
     '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
     id: localMessage.id,
@@ -413,12 +420,13 @@ console.log('[sendApiMessage HIT]', { params, localMessage });
 
       if (update?.message) {
         sendApiUpdate({
-          '@type': localMessage.isScheduled ? 'updateScheduledMessage' : 'updateMessage',
-          id: localMessage.id,
-          chatId: chat.id,
-          message: update.message,
-          isFull: true,
-        });
+  '@type': localMessage.isScheduled
+          ? 'updateScheduledMessageSendSucceeded'
+          : 'updateMessageSendSucceeded',
+             chatId: chat.id,
+            localId: localMessage.id,
+             message: update.message,
+              });
       }
     } catch (error: any) {
       cancelSendingStatusTimeout();
