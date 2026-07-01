@@ -50,6 +50,7 @@ if (DEBUG) {
 }
 
 onmessage = ({ data }: OriginMessageEvent) => {
+  console.log("[WORKER RECEIVED]", data);
   data.payloads.forEach(async (payload) => {
     switch (payload.type) {
       case 'initApi': {

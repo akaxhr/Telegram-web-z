@@ -57,6 +57,8 @@ const channel = new BroadcastChannel(DATA_BROADCAST_CHANNEL_NAME) as TypedBroadc
 const postMessagesOnTickEnd = throttleWithTickEnd(() => {
   const payloads = pendingPayloads;
   pendingPayloads = [];
+  console.log("[CONNECTOR POSTING]", pendingPayloads);
+  console.log("[WORKER INSTANCE]", worker);
   worker?.postMessage({ payloads });
 });
 
