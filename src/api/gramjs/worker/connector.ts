@@ -14,6 +14,7 @@ import generateUniqueId from '../../../util/generateUniqueId';
 import { ACCOUNT_SLOT, DATA_BROADCAST_CHANNEL_NAME } from '../../../util/multiaccount';
 import { pause, throttleWithTickEnd } from '../../../util/schedulers';
 import { callApiClient } from '../../client';
+import { sendMessage } from '../methods';
 
 type RequestState = {
   messageId: string;
@@ -166,7 +167,7 @@ export async function callApi<T extends keyof Methods>(
   };
 
   if (methodName === 'sendMessage') {
-    console.log('[CONNECTOR sendMessage -> WORKER]');
+    console.log('[CONNECTOR sendMessage -> WORKER]',sendMessage);
     return await makeRequest({
       type: 'callMethod',
       name: fnName,
