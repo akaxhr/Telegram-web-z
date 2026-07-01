@@ -2389,6 +2389,12 @@ function handleLocalMessageUpdate(
       ...('date' in messageUpdate && { date: messageUpdate.date }),
     };
 
+    console.log("[LOCAL UPDATE]", {
+  localId: localMessage.id,
+  newId: messageUpdate.id,
+  chatId: localMessage.chatId,
+});
+
     sendApiUpdate({
       '@type': localMessage.isScheduled && !isSentBefore
         ? 'updateScheduledMessageSendSucceeded'
@@ -2400,7 +2406,7 @@ function handleLocalMessageUpdate(
       webPage,
     });
   }
-
+console.log("[GRAM UPDATE]", update);
   handleGramJsUpdate(update);
 }
 

@@ -10,8 +10,9 @@ export function init(_onUpdate: OnApiUpdate) {
 }
 
 export function sendApiUpdate(update: ApiUpdate) {
+  console.log("[API UPDATE( api emmiter)]", update["@type"], update);
   queueUpdate(update);
-}
+} 
 
 export function sendImmediateApiUpdate(update: ApiUpdate) {
   onUpdate(update);
