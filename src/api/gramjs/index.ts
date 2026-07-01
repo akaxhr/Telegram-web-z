@@ -1,6 +1,8 @@
-// export { initApi, callApi, cancelApiProgress } from './methods/init';
 export {
-  initApi, callApi, cancelApiProgress, cancelApiProgressMaster, callApiLocal,
+  initApi,
+  callApi,
+  cancelApiProgress,
+  cancelApiProgressMaster,
   handleMethodCallback,
   handleMethodResponse,
   updateFullLocalDb,
