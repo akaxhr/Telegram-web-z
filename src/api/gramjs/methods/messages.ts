@@ -353,7 +353,7 @@ export function sendMessageLocal(
     messagePriceInStars,
     dice,
   });
-localMessage.id = getTempLocalMessageId();
+
   sendApiUpdate({
     '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
     id: localMessage.id,
@@ -428,6 +428,12 @@ console.log('[sendApiMessage HIT]', { params, localMessage });
              message: update.message,
               });
       }
+      console.log('[LOCAL NEW]', localMessage.id);
+
+console.log('[SERVER REAL]', {
+  localId: localMessage.id,
+  realId: update.message?.id,
+});
     } catch (error: any) {
       cancelSendingStatusTimeout();
 
