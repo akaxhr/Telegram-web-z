@@ -417,7 +417,12 @@ console.log('[sendApiMessage HIT]', { params, localMessage });
       );
 
       cancelSendingStatusTimeout();
+      console.log('[LOCAL NEW]', localMessage.id);
 
+console.log('[SERVER REAL]', {
+  localId: localMessage.id,
+  realId: update.message?.id,
+});
       if (update?.message) {
         sendApiUpdate({
   '@type': localMessage.isScheduled
@@ -428,12 +433,7 @@ console.log('[sendApiMessage HIT]', { params, localMessage });
              message: update.message,
               });
       }
-      console.log('[LOCAL NEW]', localMessage.id);
 
-console.log('[SERVER REAL]', {
-  localId: localMessage.id,
-  realId: update.message?.id,
-});
     } catch (error: any) {
       cancelSendingStatusTimeout();
 
