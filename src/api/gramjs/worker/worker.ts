@@ -16,16 +16,15 @@ const ORIGINAL_FUNCTIONS = DEBUG_LEVELS.reduce((acc, level) => {
   acc[level] = console[level];
   return acc;
 }, {} as Record<DebugLevel, (...args: any[]) => void>);
-
 function enableDebugLog() {
   DEBUG_LEVELS.forEach((level) => {
     console[level] = (...args: any[]) => {
       postMessage({
         type: 'debugLog',
         level,
-        args: JSON.parse(JSON.stringify(args, (key, value) => (typeof value === 'bigint'
-          ? value.toString()
-          : value))),
+        args: JSON.parse(JSON.stringify(args, (key, value) => (
+          typeof value === 'bigint' ? value.toString() : value
+        ))),
       });
     };
   });
@@ -50,12 +49,16 @@ if (DEBUG) {
 }
 
 onmessage = ({ data }: OriginMessageEvent) => {
-  console.log("[WORKER RECEIVED]", data);
+  console.log('[WORKER RECEIVED]', data);
+
   data.payloads.forEach(async (payload) => {
     switch (payload.type) {
       case 'initApi': {
         const { messageId, args } = payload;
-        initApi(onUpdate, args[0], args[1]).then(() => {
+
+        try {
+          await initApi(onUpdate, args[0], args[1]);
+
           if (messageId) {
             sendToOrigin({
               type: 'methodResponse',
@@ -63,14 +66,27 @@ onmessage = ({ data }: OriginMessageEvent) => {
               response: true,
             });
           }
-        });
+        } catch (error: any) {
+          if (messageId) {
+            sendToOrigin({
+              type: 'methodResponse',
+              messageId,
+              error: buildApiError(error),
+            });
+          }
+        }
+
         break;
       }
+
       case 'callMethod': {
         const {
           messageId, name, args, withCallback,
         } = payload;
+
         try {
+          console.log('[WORKER CALL METHOD]', name, args);
+
           if (messageId && withCallback) {
             const callback = (...callbackArgs: any[]) => {
               const lastArg = callbackArgs[callbackArgs.length - 1];
@@ -83,17 +99,21 @@ onmessage = ({ data }: OriginMessageEvent) => {
             };
 
             callbackState.set(messageId, callback);
-
             args.push(callback as never);
           }
 
           const response = await callApi(name, ...args);
 
-          if (DEBUG && typeof response === 'object' && 'CONSTRUCTOR_ID' in response) {
+          if (DEBUG && response && typeof response === 'object' && 'CONSTRUCTOR_ID' in response) {
             log('UNEXPECTED RESPONSE', `${name}: ${response.className}`);
           }
 
-          const { arrayBuffer } = (typeof response === 'object' && 'arrayBuffer' in response && response) || {};
+          const { arrayBuffer } = (
+            response
+            && typeof response === 'object'
+            && 'arrayBuffer' in response
+            && response
+          ) || {};
 
           if (messageId) {
             sendToOrigin({
@@ -103,9 +123,7 @@ onmessage = ({ data }: OriginMessageEvent) => {
             }, arrayBuffer);
           }
         } catch (error: any) {
-          if (DEBUG) {
-            console.error(error);
-          }
+          console.error('[WORKER CALL METHOD ERROR]', name, error);
 
           if (messageId) {
             sendToOrigin({
@@ -122,14 +140,17 @@ onmessage = ({ data }: OriginMessageEvent) => {
 
         break;
       }
+
       case 'cancelProgress': {
         const callback = callbackState.get(payload.messageId);
+
         if (callback) {
           cancelApiProgress(callback);
         }
 
         break;
       }
+
       case 'ping': {
         sendToOrigin({
           type: 'methodResponse',
@@ -138,12 +159,15 @@ onmessage = ({ data }: OriginMessageEvent) => {
 
         break;
       }
+
       case 'toggleDebugMode': {
         if (payload.isEnabled) {
           enableDebugLog();
         } else {
           disableDebugLog();
         }
+
+        break;
       }
     }
   });
@@ -151,13 +175,25 @@ onmessage = ({ data }: OriginMessageEvent) => {
 
 function handleErrors() {
   self.onerror = (e) => {
-    console.error(e);
-    sendToOrigin({ type: 'unhandledError', error: { message: e.error.message || 'Uncaught exception in worker' } });
+    console.error('[WORKER ERROR]', e);
+
+    sendToOrigin({
+      type: 'unhandledError',
+      error: {
+        message: e.error?.message || 'Uncaught exception in worker',
+      },
+    });
   };
 
   self.addEventListener('unhandledrejection', (e) => {
-    console.error(e);
-    sendToOrigin({ type: 'unhandledError', error: { message: e.reason.message || 'Uncaught rejection in worker' } });
+    console.error('[WORKER UNHANDLED REJECTION]', e);
+
+    sendToOrigin({
+      type: 'unhandledError',
+      error: {
+        message: e.reason?.message || 'Uncaught rejection in worker',
+      },
+    });
   });
 }
 
@@ -169,12 +205,17 @@ const sendToOriginOnTickEnd = throttleWithTickEnd(() => {
     });
   }
 
-  const data = { payloads: pendingPayloads };
+  const data = {
+    payloads: pendingPayloads,
+  };
+
   const transferables = pendingTransferables;
 
   pendingUpdates = [];
   pendingPayloads = [];
   pendingTransferables = [];
+
+  console.log('[WORKER -> CONNECTOR]', data);
 
   if (transferables.length) {
     postMessage(data, transferables);
@@ -194,6 +235,8 @@ function sendToOrigin(payload: WorkerPayload, transferable?: Transferable) {
 }
 
 function onUpdate(update: ApiUpdate) {
+  console.log('[WORKER UPDATE]', update);
+
   if (DEBUG && update['@type'] !== 'updateUserStatus' && update['@type'] !== 'updateServerTimeOffset') {
     log('UPDATE', update['@type'], update);
   }
