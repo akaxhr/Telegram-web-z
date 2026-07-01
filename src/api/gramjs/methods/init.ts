@@ -37,6 +37,41 @@ export function callApi<T extends keyof Methods>(
     case 'loadConfig':
     case 'loadAppConfig':
     case 'loadContactList':
+      case 'fetchQuickReplies':
+        case 'fetchAllStories':
+case 'fetchPromoData':
+case 'fetchContentSettings':
+case 'fetchRecentReactions':
+case 'fetchDefaultTagReactions':
+case 'loadAttachBots':
+case 'fetchContactSignUpSetting':
+case 'fetchNotifyDefaultSettings':
+case 'fetchNotificationExceptions':
+case 'fetchTopPeers':
+case 'fetchTopReactions':
+case 'fetchStarsStatus':
+case 'fetchStarsTopupOptions':
+case 'fetchEmojiKeywords':
+case 'fetchFeaturedEmojiStickers':
+case 'fetchSavedReactionTags':
+case 'fetchPaidReactionPrivacy':
+case 'fetchDefaultTopicIcons':
+case 'fetchAnimatedEmojis':
+case 'fetchAnimatedEmojiEffects':
+case 'fetchAvailableReactions':
+case 'fetchCollectibleEmojiStatuses':
+case 'fetchGenericEmojiEffects':
+case 'fetchPremiumGifts':
+case 'fetchTonGifts':
+case 'fetchStarGifts':
+case 'fetchAvailableEffects':
+case 'fetchStickers':
+case 'fetchTimezones':
+case 'fetchAiComposeTones':
+case 'fetchStarGiftActiveAuctions':
+case 'fetchCountryList':
+case 'fetchCustomEmoji':
+case 'fetchNearestCountry':
       return true as MethodResponse<T>;
 
     default:
