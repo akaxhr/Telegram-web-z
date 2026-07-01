@@ -121,6 +121,10 @@ deleteChannel: "chats.deleteChannel",
 };
 
 export async function callApiClient(method: string, payload?: any) {
+  if (method === 'sendMessage') {
+    console.warn('[SKIP CLIENT API] sendMessage must use worker method');
+    return undefined;
+  }
   const backendMethod = methodMap[method] ?? method;
 
   console.warn('[CLIENT API]', method, payload);

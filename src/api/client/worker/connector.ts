@@ -276,7 +276,11 @@ if (methodMap[String(fnName)]) {
   ) as unknown as Awaited<MethodResponse<T>>;
 }
 
-
+if (String(fnName) === 'sendMessage') {
+  // do not backend-route; let worker methods/messages.ts handle it
+} else if (acarthubMethods.has(String(fnName))) {
+  return await callApiClient(String(fnName), args);
+}
   if (acarthubMethods.has(String(fnName))) {
     const result = await callApiClient(String(fnName), args[0]);
     console.log('[ACARTHUB API]', fnName, result);
