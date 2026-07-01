@@ -363,12 +363,7 @@ export function sendApiMessage(
   localMessage: ApiMessage,
   onProgress?: ApiOnProgress,
 ): Promise<void> | undefined {
-  const {
-    chat, text, entities, replyInfo, suggestedPostInfo, suggestedMedia,
-    attachment, sticker, story, gif, poll, todo, contact, dice,
-    isSilent, scheduledAt, scheduleRepeatPeriod, groupedId, noWebPage, sendAs, shouldUpdateStickerSetOrder,
-    isInvertedMedia, effectId, webPageMediaSize, webPageUrl, messagePriceInStars,
-  } = params;
+  const { chat, text, entities, replyInfo, isSilent, scheduledAt, noWebPage } = params;
 
   if (!chat) return undefined;
 
@@ -393,202 +388,25 @@ export function sendApiMessage(
     clearTimeout(timeout);
   };
 
-  const randomId = generateRandomBigInt();
-
-  if (groupedId) {
-    return sendGroupedMedia({
-      chat,
-      text,
-      entities,
-      replyInfo,
-      suggestedPostInfo,
-      attachment: attachment!,
-      groupedId,
-      isSilent,
-      scheduledAt,
-      scheduleRepeatPeriod,
-      sendAs,
-      messagePriceInStars,
-    }, randomId, localMessage, onProgress, cancelSendingStatusTimeout) as ReturnType<typeof sendApiMessage>;
-  }
-
-  const messagePromise = (async () => {
-    let media: GramJs.TypeInputMedia | undefined;
-
-    if (suggestedPostInfo && suggestedMedia && !attachment) {
-      if (suggestedMedia.photo) {
-        const inputPhoto = buildInputPhoto(suggestedMedia.photo);
-        if (inputPhoto) {
-          media = new GramJs.InputMediaPhoto({
-            id: inputPhoto,
-            spoiler: suggestedMedia.photo.isSpoiler || undefined,
-          });
-        }
-      } else if (suggestedMedia.video) {
-        const inputDocument = buildInputDocument(suggestedMedia.video);
-        if (inputDocument) {
-          media = new GramJs.InputMediaDocument({
-            id: inputDocument,
-            spoiler: suggestedMedia.video.isSpoiler || undefined,
-          });
-        }
-      } else if (suggestedMedia.document) {
-        const document = suggestedMedia.document;
-        if (document.id) {
-          const localDocument = localDb.documents[document.id];
-          if (localDocument) {
-            const inputDocument = new GramJs.InputDocument({
-              id: localDocument.id,
-              accessHash: localDocument.accessHash,
-              fileReference: localDocument.fileReference,
-            });
-
-            media = new GramJs.InputMediaDocument({
-              id: inputDocument,
-            });
-          }
-        }
-      }
-    }
-
-    if (!media && attachment?.gif) {
-      media = buildInputMediaDocument(attachment.gif, attachment.shouldSendAsSpoiler);
-    }
-
-    if (!media && attachment) {
-      try {
-        media = await uploadMedia(localMessage, attachment, onProgress!);
-      } catch (err) {
-        if (DEBUG) {
-          // eslint-disable-next-line no-console
-          console.warn(err);
-        }
-
-        await mediaQueue;
-        return;
-      }
-    } else if (sticker) {
-      media = buildInputMediaDocument(sticker);
-    } else if (gif) {
-      media = buildInputMediaDocument(gif);
-    } else if (poll) {
-      try {
-        const attachedMedia = poll.attachedMedia
-          ? await uploadMedia(localMessage, poll.attachedMedia, onProgress!)
-          : undefined;
-
-        const solutionMedia = poll.solutionMedia
-          ? await uploadMedia(localMessage, poll.solutionMedia, onProgress!)
-          : undefined;
-
-        media = buildInputPoll(poll, randomId, {
-          attachedMedia,
-          solutionMedia,
-        });
-      } catch (err) {
-        if (DEBUG) {
-          // eslint-disable-next-line no-console
-          console.warn(err);
-        }
-
-        await mediaQueue;
-        return;
-      }
-    } else if (todo) {
-      media = buildInputTodo(todo);
-    } else if (story) {
-      media = buildInputStory(story);
-    } else if (webPageUrl && webPageMediaSize) {
-      media = new GramJs.InputMediaWebPage({
-        url: webPageUrl,
-        forceLargeMedia: webPageMediaSize === 'large' ? true : undefined,
-        forceSmallMedia: webPageMediaSize === 'small' ? true : undefined,
-      });
-    } else if (contact) {
-      media = new GramJs.InputMediaContact({
-        phoneNumber: contact.phoneNumber,
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        vcard: DEFAULT_PRIMITIVES.STRING,
-      });
-    } else if (dice) {
-      media = new GramJs.InputMediaDice({
-        emoticon: dice,
-      });
-    }
-
-    type SharedKeys<T, U> = {
-      [K in keyof T & keyof U]:
-      T[K] extends U[K] ? (U[K] extends T[K] ? K : never) : never
-    }[keyof T & keyof U];
-
-    type SharedRecord<T, U> = Pick<T, SharedKeys<T, U>>;
-
-    type SendMediaArgs = ConstructorParameters<typeof GramJs.messages.SendMedia>[0];
-    type SendMessageArgs = ConstructorParameters<typeof GramJs.messages.SendMessage>[0];
-
-    type SharedArgs = SharedRecord<SendMediaArgs, SendMessageArgs>;
-
-    const args: SharedArgs = {
-      clearDraft: true,
-      message: text || DEFAULT_PRIMITIVES.STRING,
-      entities: entities ? entities.map(buildMtpMessageEntity) : undefined,
-      peer: buildInputPeer(chat.id, chat.accessHash),
-      randomId,
-      replyTo: replyInfo && buildInputReplyTo(replyInfo),
-      silent: isSilent || undefined,
-      scheduleDate: scheduledAt,
-      scheduleRepeatPeriod,
-      sendAs: sendAs && buildInputPeer(sendAs.id, sendAs.accessHash),
-      updateStickersetsOrder: shouldUpdateStickerSetOrder || undefined,
-      invertMedia: isInvertedMedia || undefined,
-      effect: effectId ? BigInt(effectId) : undefined,
-      allowPaidStars: messagePriceInStars ? BigInt(messagePriceInStars) : undefined,
-      suggestedPost: suggestedPostInfo && buildInputSuggestedPost(suggestedPostInfo),
-    };
-
+  return (async () => {
     try {
-      let update;
-
-      if (media) {
-        update = await request(
-          'messages.sendMedia',
-          {
-            chatId: chat.id,
-            localMessage,
-            text,
-            entities,
-            replyInfo,
-            isSilent,
-            scheduledAt,
-            noWebPage,
-            media,
-            args,
-          },
-          {
-            shouldThrow: true,
-            shouldIgnoreUpdates: true,
-          } as any,
-        );
-      } else {
-        update = await request(
-          'messages.sendMessage',
-          {
-            chatId: chat.id,
-            localMessage,
-            text,
-            entities,
-            replyInfo,
-            isSilent,
-            scheduledAt,
-            noWebPage,
-          },
-          {
-            shouldThrow: true,
-            shouldIgnoreUpdates: true,
-          } as any,
-        );
-      }
+      const update = await request(
+        'messages.sendMessage',
+        {
+          chatId: chat.id,
+          localMessage,
+          text,
+          entities,
+          replyInfo,
+          isSilent,
+          scheduledAt,
+          noWebPage,
+        },
+        {
+          shouldThrow: true,
+          shouldIgnoreUpdates: true,
+        } as any,
+      );
 
       cancelSendingStatusTimeout();
 
@@ -600,8 +418,6 @@ export function sendApiMessage(
           message: update.message,
           isFull: true,
         });
-      } else if (update) {
-        handleLocalMessageUpdate(localMessage, update);
       }
     } catch (error: any) {
       cancelSendingStatusTimeout();
@@ -610,12 +426,10 @@ export function sendApiMessage(
         '@type': localMessage.isScheduled ? 'updateScheduledMessageSendFailed' : 'updateMessageSendFailed',
         chatId: chat.id,
         localId: localMessage.id,
-        error: error.errorMessage || error.message || 'SEND_FAILED',
+        error: error?.message || 'SEND_FAILED',
       });
     }
   })();
-
-  return messagePromise;
 }
 
 
