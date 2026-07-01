@@ -1947,21 +1947,8 @@ async function sendMessage<T extends GlobalState>(
   global: T,
   params: SendMessageParams,
 ) {
-  console.log('[INNER PARAMS CHECK]', params);
-
-  if (!params) {
-    console.error('[SEND STOP] params is undefined');
-    return;
-  }
-
   if (params.replyInfo || IS_IOS) {
-    console.log('[SEND WAIT RAF]');
     await rafPromise();
-  }
-
-  if (!params.chat) {
-    console.error('[SEND STOP] chat missing', params);
-    return;
   }
 
   let currentMessageKey: MessageKey | undefined;
@@ -1977,39 +1964,7 @@ async function sendMessage<T extends GlobalState>(
     setGlobal(global);
   } : undefined;
 
-  console.log('[SEND BEFORE LOCAL]');
-
-  let localMessage: Awaited<ReturnType<typeof callApi<'sendMessageLocal'>>> | undefined;
-
-  try {
-    localMessage = await Promise.race([
-      callApi('sendMessageLocal', params),
-      new Promise<undefined>((_, reject) => {
-        setTimeout(() => reject(new Error('sendMessageLocal timeout')), 3000);
-      }),
-    ]);
-  } catch (err) {
-    console.error('[SEND LOCAL ERROR]', err);
-    return;
-  }
-
-  console.log('[SEND AFTER LOCAL]', localMessage);
-
-  if (!localMessage) {
-    console.error('[SEND STOP] localMessage undefined');
-    return;
-  }
-
-  console.log('[SEND BEFORE API]');
-
-  try {
-    await callApi('sendApiMessage', params, localMessage, progressCallback);
-  } catch (err) {
-    console.error('[SEND API ERROR]', err);
-    return;
-  }
-
-  console.log('[SEND AFTER API]');
+  await callApi('sendMessage', params, progressCallback);
 
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
