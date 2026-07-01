@@ -14,8 +14,8 @@ import generateUniqueId from '../../../util/generateUniqueId';
 import { ACCOUNT_SLOT, DATA_BROADCAST_CHANNEL_NAME } from '../../../util/multiaccount';
 import { pause, throttleWithTickEnd } from '../../../util/schedulers';
 import { callApiClient } from '../../client';
-import { sendMessage } from '../methods';
-import { METHODS } from 'http';
+
+
 
 type RequestState = {
   messageId: string;
