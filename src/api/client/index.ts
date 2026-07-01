@@ -7,7 +7,6 @@ const methodMap: Record<string, string> = {
   fetchRichMessage: "messages.fetchRichMessage",
   fetchMessagesById: "messages.fetchMessagesByIds",
 
-  sendMessage: "messages.sendMessage",
   editMessage: "messages.editMessage",
   deleteMessages: "messages.deleteMessages",
   fetchMessageViews: "messages.getMessagesViews",
