@@ -20,6 +20,8 @@ return Promise.resolve();
 }
 
 export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<T>): MethodResponse<T> {
+  console.log('[WORKER METHODS CALL]', fnName);
+
   const method = methods[fnName] as ((...args: MethodArgs<T>) => MethodResponse<T>) | undefined;
 
   if (method) {
@@ -34,11 +36,10 @@ export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<
       return true as MethodResponse<T>;
 
     default:
-      console.warn('Worker method missing:', fnName);
+      console.warn('[WORKER METHOD MISSING]', fnName);
       return undefined as MethodResponse<T>;
   }
 }
-
 export function cancelApiProgress(progressCallback: ApiOnProgress) {
   progressCallback.isCanceled = true;
 }
