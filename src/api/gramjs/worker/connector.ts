@@ -8,7 +8,6 @@ import { DEBUG, IGNORE_UNHANDLED_ERRORS } from '../../../config';
 import { IS_TAURI } from '../../../util/browser/globalEnvironment';
 import { IS_SAFARI } from '../../../util/browser/windowEnvironment';
 import { logDebugMessage } from '../../../util/debugConsole';
-import { buildLocalMessage } from '../apiBuilders/messages';
 import Deferred from '../../../util/Deferred';
 import { getCurrentTabId, subscribeToMasterChange } from '../../../util/establishMultitabRole';
 import generateUniqueId from '../../../util/generateUniqueId';
@@ -181,112 +180,25 @@ export async function callApi<T extends keyof Methods>(
   ...args: MethodArgs<T>
 ): EnsurePromise<MethodResponse<T>> {
   const acarthubMethods = new Set([
-  'loadAllChats',
+  'fetchChats',
+  'fetchSavedChats',
+  'fetchPinnedDialogs',
+  'fetchChatFolders',
+  'fetchChat',
+  'fetchMessages',
+  'sendMessage',
   'oldFetchLangPack',
   'fetchLangStrings',
   'fetchLanguage',
   'fetchLangPack',
-  'fetchChat',
 ]);
-  if (String(fnName) === 'sendMessageLocal') {
-  console.log('[LOCAL HIT] sendMessageLocal');
-
-  const params: any = args[0];
-
-  const { message: localMessage, poll: localPoll } = buildLocalMessage({
-    chat: params.chat,
-    lastMessageId: params.lastMessageId,
-    text: params.text,
-    entities: params.entities,
-    replyInfo: params.replyInfo,
-    suggestedPostInfo: params.suggestedPostInfo,
-    attachment: params.attachment,
-    sticker: params.sticker,
-    story: params.story,
-    gif: params.gif,
-    poll: params.poll,
-    todo: params.todo,
-    contact: params.contact,
-    groupedId: params.groupedId,
-    scheduledAt: params.scheduledAt,
-    scheduleRepeatPeriod: params.scheduleRepeatPeriod,
-    sendAs: params.sendAs,
-    isInvertedMedia: params.isInvertedMedia,
-    effectId: params.effectId,
-    isPending: params.isPending,
-    messagePriceInStars: params.messagePriceInStars,
-    dice: params.dice,
-  });
-
-  updateCallback({
-    '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
-    id: localMessage.id,
-    chatId: params.chat.id,
-    message: localMessage,
-    poll: localPoll,
-    wasDrafted: params.wasDrafted,
-  });
-
-  return localMessage as unknown as Awaited<MethodResponse<T>>;
-}
-  const methodMap: Record<string, string> = {
-  // ==========================
-  // Messages
-  // ==========================
-  fetchMessages: "messages.fetchMessages",
-  fetchMessage: "messages.fetchMessage",
-  fetchRichMessage: "messages.fetchRichMessage",
-  fetchMessagesById: "messages.fetchMessagesByIds",
   
 
-  editMessage: "messages.editMessage",
-  deleteMessages: "messages.deleteMessages",
-  fetchMessageViews: "messages.getMessagesViews",
-
-  // ==========================
-  // Users
-  // ==========================
-  getFullUser: "users.getFullUser",
-  getCommonChats: "users.getCommonChats",
-  getRequirementsToContact: "users.getRequirementsToContact",
-  getNearestDc: "users.getNearestDc",
-  getContacts: "users.getContacts",
-  getUsers: "users.getUsers",
-  importContacts: "users.importContacts",
-  addContact: "users.addContact",
-  deleteContact: "users.deleteContact",
-  toggleNoPaidMessagesException: "users.toggleNoPaidMessagesException",
-  getPaidMessagesRevenue: "users.getPaidMessagesRevenue",
-  getUserPhotos: "users.getUserPhotos",
-  reportSpam: "users.reportSpam",
-  updateEmojiStatus: "users.updateEmojiStatus",
-  editCloseFriends: "users.editCloseFriends",
-  updateContactNote: "users.updateContactNote",
-  toggleNoForwards: "users.toggleNoForwards",
-};
-
-if (methodMap[String(fnName)]) {
-  console.log('[METHOD MAP]', fnName, args);
-
-  const payload = args[0] ?? {};
-
-  return await callApiClient(
-    methodMap[String(fnName)],
-    payload,
-  ) as unknown as Awaited<MethodResponse<T>>;
-}
-
-if (String(fnName) === 'sendMessage') {
-  // do not backend-route; let worker methods/messages.ts handle it
-} else if (acarthubMethods.has(String(fnName))) {
-  return await callApiClient(String(fnName), args);
-}
   if (acarthubMethods.has(String(fnName))) {
-    const result = await callApiClient(String(fnName), args[0]);
+    const result = await callApiClient(String(fnName), args);
     console.log('[ACARTHUB API]', fnName, result);
-    console.log("USERS", result.users);
-    console.log("CHATS", result.chats);
-    return result as unknown as Awaited<MethodResponse<T>>;
+
+    return result as Awaited<MethodResponse<T>>;
   }
 
   const result = await makeRequest({
