@@ -325,7 +325,6 @@ addActionHandler('loadMessagesById', async (global, actions, payload): Promise<v
 });
 
 addActionHandler('sendMessage', async (global, actions, payload): Promise<void> => {
-  console.log('[ACTION SENDMESSAGE FIRED]', payload);
   const { messageList, tabId = getCurrentTabId() } = payload;
 
   const { storyId, peerId: storyPeerId } = selectCurrentViewedStory(global, tabId);
@@ -371,20 +370,10 @@ addActionHandler('sendMessage', async (global, actions, payload): Promise<void> 
 
   const replyInfo = storyReplyInfo || messageReplyInfo;
 
-const listedIds = selectListedIds(global, chatId!, threadId!) || [];
-const viewportIds = selectViewportIds(global, chatId!, threadId!, tabId) || [];
+  const threadInfo = selectThreadInfo(global, chatId!, threadId!);
+  const lastMessageId = threadId === MAIN_THREAD_ID
+    ? selectChatLastMessageId(global, chatId!) : threadInfo?.lastMessageId;
 
-const allVisibleIds = [...listedIds, ...viewportIds].filter((id) => Number.isFinite(id));
-
-const fallbackLastMessageId = allVisibleIds.length
-  ? Math.max(...allVisibleIds)
-  : 0;
-
-const threadInfo = selectThreadInfo(global, chatId!, threadId!);
-
-const lastMessageId = threadId === MAIN_THREAD_ID
-  ? selectChatLastMessageId(global, chatId!) || fallbackLastMessageId
-  : threadInfo?.lastMessageId || fallbackLastMessageId;
   const messagePriceInStars = await getPeerStarsForMessage(global, chatId!);
 
   const suggestedPostPrice = draftSuggestedPostInfo?.price;
@@ -593,6 +582,7 @@ const lastMessageId = threadId === MAIN_THREAD_ID
   }
   if (localMessages?.length) sendMessagesWithNotification(global, localMessages);
 });
+
 
 addActionHandler('sendInviteMessages', async (global, actions, payload): Promise<void> => {
   const { chatId, userIds, tabId = getCurrentTabId() } = payload;
@@ -1938,21 +1928,26 @@ async function sendMessageOrReduceLocal<T extends GlobalState>(
   sendParams: SendMessageParams,
   localMessages: SendMessageParams[],
 ) {
-  console.log('[SEND OR REDUCE PARAMS]', sendParams);
-  await sendMessage(global, sendParams);
+  if (!sendParams.messagePriceInStars) {
+    sendMessage(global, sendParams);
+  } else {
+    const message = await callApi('sendMessageLocal', sendParams);
+    if (message) {
+      localMessages.push({
+        ...sendParams,
+        localMessage: message,
+      });
+    }
+  }
 }
 
-
-async function sendMessage<T extends GlobalState>(
-  global: T,
-  params: SendMessageParams,
-) {
+async function sendMessage<T extends GlobalState>(global: T, params: SendMessageParams) {
+  // @optimization
   if (params.replyInfo || IS_IOS) {
     await rafPromise();
   }
 
   let currentMessageKey: MessageKey | undefined;
-
   const progressCallback = params.attachment ? (progress: number, messageKey: MessageKey) => {
     if (!uploadProgressCallbacks.has(messageKey)) {
       currentMessageKey = messageKey;
@@ -1963,13 +1958,12 @@ async function sendMessage<T extends GlobalState>(
     global = updateUploadByMessageKey(global, messageKey, progress);
     setGlobal(global);
   } : undefined;
-
   await callApi('sendMessage', params, progressCallback);
-
   if (progressCallback && currentMessageKey) {
     global = getGlobal();
     global = updateUploadByMessageKey(global, currentMessageKey, undefined);
     setGlobal(global);
+
     uploadProgressCallbacks.delete(currentMessageKey);
   }
 }
