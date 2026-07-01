@@ -19,10 +19,20 @@ export function initApi(_onUpdate: OnApiUpdate, initialArgs: ApiInitialArgs, ini
 return Promise.resolve();
 }
 
-export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<T>): MethodResponse<T> {
-  console.log('Worker skipped:', fnName);
+export function callApi<T extends keyof Methods>(
+  fnName: T,
+  ...args: MethodArgs<T>
+): MethodResponse<T> {
+  console.log('[WORKER METHODS CALL]', fnName);
 
-  switch (fnName) {
+  const method = methods[fnName] as any;
+
+  if (method) {
+    console.log('[WORKER METHOD FOUND]', fnName);
+    return method(...args);
+  }
+
+  switch (String(fnName)) {
     case 'loadAllChats':
     case 'loadConfig':
     case 'loadAppConfig':
@@ -30,10 +40,10 @@ export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<
       return true as MethodResponse<T>;
 
     default:
+      console.warn('[WORKER METHOD MISSING]', fnName);
       return undefined as MethodResponse<T>;
   }
 }
-
 export function cancelApiProgress(progressCallback: ApiOnProgress) {
   progressCallback.isCanceled = true;
 }

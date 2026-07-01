@@ -33,6 +33,7 @@ export function callApi<T extends keyof Methods>(fnName: T, ...args: MethodArgs<
     case 'loadConfig':
     case 'loadAppConfig':
     case 'loadContactList':
+        console.log('[WORKER methods/init callApi]', fnName);
       return true as MethodResponse<T>;
 
     default:
