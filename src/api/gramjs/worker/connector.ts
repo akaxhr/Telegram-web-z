@@ -173,10 +173,6 @@ export async function callApi<T extends keyof Methods>(
     fetchMessageViews: 'messages.getMessagesViews',
   };
 
- if (methodName === 'sendMessage') {
-  console.log('[CONNECTOR sendMessage -> DIRECT METHOD]', methods.sendMessage);
-  return await (methods.sendMessage as any)(...args) as Awaited<MethodResponse<T>>;
-   }
 
   if (methodMap[methodName]) {
     return await callApiClient(methodMap[methodName], args[0]) as Awaited<MethodResponse<T>>;
