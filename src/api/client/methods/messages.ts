@@ -315,6 +315,7 @@ export function sendMessageLocal(
     contact, scheduledAt, scheduleRepeatPeriod, groupedId, sendAs, wasDrafted, isInvertedMedia, effectId, isPending,
     messagePriceInStars, dice,
   } = params;
+  console.log('[sendMessageLocal HIT]', params);
 
   if (!chat) return undefined;
 
@@ -364,7 +365,7 @@ export function sendApiMessage(
   onProgress?: ApiOnProgress,
 ): Promise<void> | undefined {
   const { chat, text, entities, replyInfo, isSilent, scheduledAt, noWebPage } = params;
-
+console.log('[sendApiMessage HIT]', { params, localMessage });
   if (!chat) return undefined;
 
   let isSendCompleted = false;
@@ -436,10 +437,17 @@ export async function sendMessage(
   params: SendMessageParams,
   onProgress?: ApiOnProgress,
 ): Promise<void> {
+  console.log('[METHODS sendMessage HIT]', params);
+
   const localMessage = params.localMessage || await sendMessageLocal(params);
+
+  console.log('[METHODS sendMessage LOCAL]', localMessage);
+
   if (!localMessage) return;
 
   await sendApiMessage(params, localMessage, onProgress);
+
+  console.log('[METHODS sendMessage DONE]');
 }
 
 export async function editTodo({
