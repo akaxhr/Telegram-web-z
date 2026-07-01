@@ -316,7 +316,8 @@ export async function fetchMessagesById({
 
 export function sendMessageLocal(
   params: SendMessageParams,
-) {
+  shouldEmitLocalUpdate = true,
+){
   const {
     chat, lastMessageId, text, entities, replyInfo, suggestedPostInfo, attachment, sticker, story, gif, poll, todo,
     contact, scheduledAt, scheduleRepeatPeriod, groupedId, sendAs, wasDrafted, isInvertedMedia, effectId, isPending,
@@ -354,6 +355,7 @@ export function sendMessageLocal(
     dice,
   });
 
+  if (shouldEmitLocalUpdate) {
   sendApiUpdate({
     '@type': localMessage.isScheduled ? 'newScheduledMessage' : 'newMessage',
     id: localMessage.id,
@@ -362,7 +364,7 @@ export function sendMessageLocal(
     poll: localPoll,
     wasDrafted,
   });
-
+}
   return Promise.resolve(localMessage);
 }
 
@@ -460,15 +462,40 @@ export async function sendMessage(
 ): Promise<void> {
   console.log('[METHODS sendMessage HIT]', params);
 
-  const localMessage = params.localMessage || await sendMessageLocal(params);
+  const localMessage = params.localMessage || await sendMessageLocal(params, false);
 
-  console.log('[METHODS sendMessage LOCAL]', localMessage);
+  if (!localMessage || !params.chat) return;
 
-  if (!localMessage) return;
+  const result = await request(
+    'messages.sendMessage',
+    {
+      chatId: params.chat.id,
+      localMessage,
+      text: params.text,
+      entities: params.entities,
+      replyInfo: params.replyInfo,
+      isSilent: params.isSilent,
+      scheduledAt: params.scheduledAt,
+      noWebPage: params.noWebPage,
+    },
+    {
+      shouldThrow: true,
+      shouldIgnoreUpdates: true,
+    } as any,
+  );
 
-  await sendApiMessage(params, localMessage, onProgress);
-
-  console.log('[METHODS sendMessage DONE]');
+  if (result?.message) {
+    sendApiUpdate({
+      '@type': result.message.isScheduled ? 'newScheduledMessage' : 'newMessage',
+      id: result.message.id,
+      chatId: params.chat.id,
+      message: {
+        ...result.message,
+        sendingState: undefined,
+      },
+      wasDrafted: params.wasDrafted,
+    });
+  }
 }
 
 export async function editTodo({
