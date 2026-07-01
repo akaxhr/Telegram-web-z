@@ -59,7 +59,9 @@ const postMessagesOnTickEnd = throttleWithTickEnd(() => {
   pendingPayloads = [];
   console.log("[CONNECTOR POSTING]", pendingPayloads);
   console.log("[WORKER INSTANCE]", worker);
+  
   worker?.postMessage({ payloads });
+  console.log(payloads);
 });
 
 function postMessageOnTickEnd(payload: OriginPayload) {
