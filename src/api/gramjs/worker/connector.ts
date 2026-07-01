@@ -168,8 +168,8 @@ export async function callApi<T extends keyof Methods>(
   };
 
  if (methodName === 'sendMessage') {
-  console.log('[CONNECTOR sendMessage -> DIRECT METHOD]', METHODS.sendMessage);
-  return await (METHODS.sendMessage as any)(...args) as Awaited<MethodResponse<T>>;
+  console.log('[CONNECTOR sendMessage -> DIRECT METHOD]', methods.sendMessage);
+  return await (methods.sendMessage as any)(...args) as Awaited<MethodResponse<T>>;
    }
 
   if (methodMap[methodName]) {
