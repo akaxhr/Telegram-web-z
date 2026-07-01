@@ -462,44 +462,38 @@ export async function sendMessage(
 ): Promise<void> {
   console.log('[METHODS sendMessage HIT]', params);
 
-  const localMessage = params.localMessage || await sendMessageLocal(params, true);
+  const localMessage = params.localMessage || await sendMessageLocal(params, false);
 
   if (!localMessage || !params.chat) return;
 
-  try {
-    const result = await request(
-      'messages.sendMessage',
-      {
-        chatId: params.chat.id,
-        localMessage,
-        text: params.text,
-        entities: params.entities,
-        replyInfo: params.replyInfo,
-        isSilent: params.isSilent,
-        scheduledAt: params.scheduledAt,
-        noWebPage: params.noWebPage,
-      },
-      {
-        shouldThrow: true,
-        shouldIgnoreUpdates: true,
-      } as any,
-    );
-
-    console.log('[MESSAGE SENT OK]', result);
-
-    // IMPORTANT:
-    // Do NOT replace local message.
-    // Do NOT updateMessageSendSucceeded.
-    // Do NOT delete local message on success.
-    // Just leave it visible.
-
-  } catch (error: any) {
-    console.error('[MESSAGE SEND FAILED]', error);
-
-    sendApiUpdate({
-      '@type': 'deleteMessages',
+  const result = await request(
+    'messages.sendMessage',
+    {
       chatId: params.chat.id,
-      ids: [localMessage.id],
+      localMessage,
+      text: params.text,
+      entities: params.entities,
+      replyInfo: params.replyInfo,
+      isSilent: params.isSilent,
+      scheduledAt: params.scheduledAt,
+      noWebPage: params.noWebPage,
+    },
+    {
+      shouldThrow: true,
+      shouldIgnoreUpdates: true,
+    } as any,
+  );
+
+  if (result?.message) {
+    sendApiUpdate({
+      '@type': result.message.isScheduled ? 'newScheduledMessage' : 'newMessage',
+      id: result.message.id,
+      chatId: params.chat.id,
+      message: {
+        ...result.message,
+        sendingState: undefined,
+      },
+      wasDrafted: params.wasDrafted,
     });
   }
 }
