@@ -15,6 +15,7 @@ import { ACCOUNT_SLOT, DATA_BROADCAST_CHANNEL_NAME } from '../../../util/multiac
 import { pause, throttleWithTickEnd } from '../../../util/schedulers';
 import { callApiClient } from '../../client';
 import { sendMessage } from '../methods';
+import { METHODS } from 'http';
 
 type RequestState = {
   messageId: string;
@@ -166,14 +167,10 @@ export async function callApi<T extends keyof Methods>(
     fetchMessageViews: 'messages.getMessagesViews',
   };
 
-  if (methodName === 'sendMessage') {
-    console.log('[CONNECTOR sendMessage -> WORKER]',sendMessage);
-    return await makeRequest({
-      type: 'callMethod',
-      name: fnName,
-      args,
-    }) as EnsurePromise<MethodResponse<T>>;
-  }
+ if (methodName === 'sendMessage') {
+  console.log('[CONNECTOR sendMessage -> DIRECT METHOD]', METHODS.sendMessage);
+  return await (METHODS.sendMessage as any)(...args) as Awaited<MethodResponse<T>>;
+   }
 
   if (methodMap[methodName]) {
     return await callApiClient(methodMap[methodName], args[0]) as Awaited<MethodResponse<T>>;
@@ -188,6 +185,7 @@ export async function callApi<T extends keyof Methods>(
     name: fnName,
     args,
   }) as EnsurePromise<MethodResponse<T>>;
+
 }
 export function cancelApiProgress(progressCallback: ApiOnProgress) {
   progressCallback.isCanceled = true;
