@@ -460,39 +460,32 @@ export async function sendMessage(
   params: SendMessageParams,
   onProgress?: ApiOnProgress,
 ): Promise<void> {
-  console.log('[METHODS sendMessage HIT]', params);
-
-  const localMessage = params.localMessage || await sendMessageLocal(params, false);
-
+  const localMessage = params.localMessage || await sendMessageLocal(params, true);
   if (!localMessage || !params.chat) return;
 
-  const result = await request(
-    'messages.sendMessage',
-    {
-      chatId: params.chat.id,
-      localMessage,
-      text: params.text,
-      entities: params.entities,
-      replyInfo: params.replyInfo,
-      isSilent: params.isSilent,
-      scheduledAt: params.scheduledAt,
-      noWebPage: params.noWebPage,
-    },
-    {
-      shouldThrow: true,
-      shouldIgnoreUpdates: true,
-    } as any,
-  );
+  const result = await request('messages.sendMessage', {
+    chatId: params.chat.id,
+    localMessage,
+    text: params.text,
+    entities: params.entities,
+    replyInfo: params.replyInfo,
+    isSilent: params.isSilent,
+    scheduledAt: params.scheduledAt,
+    noWebPage: params.noWebPage,
+  }, { shouldThrow: true, shouldIgnoreUpdates: true } as any);
 
   if (result?.message) {
     sendApiUpdate({
-      '@type': result.message.isScheduled ? 'newScheduledMessage' : 'newMessage',
+      '@type': 'deleteMessages',
+      chatId: params.chat.id,
+      ids: [localMessage.id],
+    });
+
+    sendApiUpdate({
+      '@type': 'newMessage',
       id: result.message.id,
       chatId: params.chat.id,
-      message: {
-        ...result.message,
-        sendingState: undefined,
-      },
+      message: { ...result.message, sendingState: undefined },
       wasDrafted: params.wasDrafted,
     });
   }
