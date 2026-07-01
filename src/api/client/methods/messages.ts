@@ -436,17 +436,10 @@ export async function sendMessage(
   params: SendMessageParams,
   onProgress?: ApiOnProgress,
 ): Promise<void> {
-  console.log('[METHOD sendMessage START]', params);
-
   const localMessage = params.localMessage || await sendMessageLocal(params);
-
-  console.log('[METHOD localMessage]', localMessage);
-
   if (!localMessage) return;
 
   await sendApiMessage(params, localMessage, onProgress);
-
-  console.log('[METHOD sendMessage DONE]');
 }
 
 export async function editTodo({
