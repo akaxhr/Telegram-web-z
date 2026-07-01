@@ -460,41 +460,40 @@ export async function sendMessage(
   params: SendMessageParams,
   onProgress?: ApiOnProgress,
 ): Promise<void> {
-  console.log('[METHODS sendMessage HIT]', params);
+  if (!params.chat) return;
 
-  const localMessage = params.localMessage || await sendMessageLocal(params, false);
-
-  if (!localMessage || !params.chat) return;
-
-  const result = await request(
-    'messages.sendMessage',
-    {
-      chatId: params.chat.id,
-      localMessage,
-      text: params.text,
-      entities: params.entities,
-      replyInfo: params.replyInfo,
-      isSilent: params.isSilent,
-      scheduledAt: params.scheduledAt,
-      noWebPage: params.noWebPage,
-    },
-    {
-      shouldThrow: true,
-      shouldIgnoreUpdates: true,
-    } as any,
-  );
-
-  if (result?.message) {
-    sendApiUpdate({
-      '@type': result.message.isScheduled ? 'newScheduledMessage' : 'newMessage',
-      id: result.message.id,
-      chatId: params.chat.id,
-      message: {
-        ...result.message,
-        sendingState: undefined,
+  try {
+    const result = await request(
+      'messages.sendMessage',
+      {
+        chatId: params.chat.id,
+        text: params.text,
+        entities: params.entities,
+        replyInfo: params.replyInfo,
+        isSilent: params.isSilent,
+        scheduledAt: params.scheduledAt,
+        noWebPage: params.noWebPage,
       },
-      wasDrafted: params.wasDrafted,
-    });
+      {
+        shouldThrow: true,
+        shouldIgnoreUpdates: true,
+      } as any,
+    );
+
+    if (result?.message) {
+      sendApiUpdate({
+        '@type': 'newMessage',
+        id: result.message.id,
+        chatId: params.chat.id,
+        message: {
+          ...result.message,
+          sendingState: undefined,
+        },
+        wasDrafted: params.wasDrafted,
+      });
+    }
+  } catch (error) {
+    console.error('[SEND FAILED]', error);
   }
 }
 
