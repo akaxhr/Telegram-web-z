@@ -129,87 +129,61 @@ export function setShouldEnableDebugLog(value: boolean) {
  * Call a worker method on this tab's worker, without transferring to master tab
  * Mostly needed to disconnect worker when re-electing master
  */
-export function callApiLocal<T extends keyof Methods>(
-  fnName: T, ...args: MethodArgs<T>
-): EnsurePromise<MethodResponse<T>> {
-  if (!isInited) {
-    if (NO_QUEUE_BEFORE_INIT.has(fnName)) {
-      return Promise.resolve(undefined) as EnsurePromise<MethodResponse<T>>;
-    }
-
-    const deferred = new Deferred();
-    localApiRequestsQueue.push({ fnName, args, deferred });
-
-    return deferred.promise as EnsurePromise<MethodResponse<T>>;
-  }
-
-  const promise = makeRequest({
-    type: 'callMethod',
-    name: fnName,
-    args,
-  });
-
-  // Some TypeScript magic to make sure `VirtualClass` is never returned from any method
-  if (DEBUG) {
-    (async () => {
-      try {
-        type ForbiddenTypes =
-          Api.VirtualClass<any>
-          | (Api.VirtualClass<any> | undefined)[];
-        type ForbiddenResponses =
-          ForbiddenTypes
-          | (AnyLiteral & Record<string, ForbiddenTypes>);
-
-        // Unwrap all chained promises
-        const response = await promise;
-        // Make sure responses do not include `VirtualClass` instances
-        const allowedResponse: Exclude<typeof response, ForbiddenResponses> = response;
-        // Suppress "unused variable" constraint
-        void allowedResponse;
-      } catch (err) {
-        // Do noting
-      }
-    })();
-  }
-
-  return promise as EnsurePromise<MethodResponse<T>>;
-}
-
 export async function callApi<T extends keyof Methods>(
   fnName: T,
   ...args: MethodArgs<T>
 ): EnsurePromise<MethodResponse<T>> {
+  console.log('[CONNECTOR callApi]', fnName);
+
+  const methodName = String(fnName);
+
   const acarthubMethods = new Set([
-  'fetchChats',
-  'fetchSavedChats',
-  'fetchPinnedDialogs',
-  'fetchChatFolders',
-  'fetchChat',
-  'fetchMessages',
-  'sendMessage',
-  'oldFetchLangPack',
-  'fetchLangStrings',
-  'fetchLanguage',
-  'fetchLangPack',
-]);
-  
+    'loadAllChats',
+    'oldFetchLangPack',
+    'fetchLangStrings',
+    'fetchLanguage',
+    'fetchLangPack',
+    'fetchChat',
+    'fetchChats',
+    'fetchMessages',
+    'fetchMessage',
+    'fetchRichMessage',
+    'fetchMessagesById',
+  ]);
 
-  if (acarthubMethods.has(String(fnName))) {
-    const result = await callApiClient(String(fnName), args);
-    console.log('[ACARTHUB API]', fnName, result);
+  const methodMap: Record<string, string> = {
+    fetchMessages: 'messages.fetchMessages',
+    fetchMessage: 'messages.fetchMessage',
+    fetchRichMessage: 'messages.fetchRichMessage',
+    fetchMessagesById: 'messages.fetchMessagesByIds',
+    editMessage: 'messages.editMessage',
+    deleteMessages: 'messages.deleteMessages',
+    fetchMessageViews: 'messages.getMessagesViews',
+  };
 
-    return result as Awaited<MethodResponse<T>>;
+  if (methodName === 'sendMessage') {
+    console.log('[CONNECTOR sendMessage -> WORKER]');
+    return await makeRequest({
+      type: 'callMethod',
+      name: fnName,
+      args,
+    }) as EnsurePromise<MethodResponse<T>>;
   }
 
-  const result = await makeRequest({
+  if (methodMap[methodName]) {
+    return await callApiClient(methodMap[methodName], args[0]) as Awaited<MethodResponse<T>>;
+  }
+
+  if (acarthubMethods.has(methodName)) {
+    return await callApiClient(methodName, args[0]) as Awaited<MethodResponse<T>>;
+  }
+
+  return await makeRequest({
     type: 'callMethod',
     name: fnName,
     args,
-  });
-
-  return result as EnsurePromise<MethodResponse<T>>;
+  }) as EnsurePromise<MethodResponse<T>>;
 }
-
 export function cancelApiProgress(progressCallback: ApiOnProgress) {
   progressCallback.isCanceled = true;
 
