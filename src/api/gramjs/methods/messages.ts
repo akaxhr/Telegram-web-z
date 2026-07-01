@@ -372,7 +372,9 @@ export function sendApiMessage(
   onProgress?: ApiOnProgress,
 ): Promise<void> | undefined {
   const { chat, text, entities, replyInfo, isSilent, scheduledAt, noWebPage } = params;
-console.log('[sendApiMessage HIT]', { params, localMessage });
+
+  console.log('[sendApiMessage HIT]', { params, localMessage });
+
   if (!chat) return undefined;
 
   let isSendCompleted = false;
@@ -419,29 +421,34 @@ console.log('[sendApiMessage HIT]', { params, localMessage });
       cancelSendingStatusTimeout();
 
       if (update?.message) {
-        sendApiUpdate({
-  '@type': localMessage.isScheduled
-          ? 'updateScheduledMessageSendSucceeded'
-          : 'updateMessageSendSucceeded',
-             chatId: chat.id,
-            localId: localMessage.id,
-             message: update.message,
-              });
-      }
-      console.log('[LOCAL NEW]', localMessage.id);
+        console.log('[SERVER REAL]', {
+          localId: localMessage.id,
+          realId: update.message.id,
+        });
 
-console.log('[SERVER REAL]', {
-  localId: localMessage.id,
-  realId: update.message?.id,
-});
+        sendApiUpdate({
+          '@type': localMessage.isScheduled
+            ? 'updateScheduledMessageSendSucceeded'
+            : 'updateMessageSendSucceeded',
+          chatId: chat.id,
+          localId: localMessage.id,
+          message: update.message,
+        });
+
+        return;
+      }
+
+      console.warn('[SEND NO MESSAGE RETURNED]', update);
     } catch (error: any) {
       cancelSendingStatusTimeout();
 
       sendApiUpdate({
-        '@type': localMessage.isScheduled ? 'updateScheduledMessageSendFailed' : 'updateMessageSendFailed',
+        '@type': localMessage.isScheduled
+          ? 'updateScheduledMessageSendFailed'
+          : 'updateMessageSendFailed',
         chatId: chat.id,
         localId: localMessage.id,
-        error: error?.message || 'SEND_FAILED',
+        error: error?.errorMessage || error?.message || 'SEND_FAILED',
       });
     }
   })();
