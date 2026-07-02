@@ -773,6 +773,7 @@ addActionHandler('clearDraft', (global, actions, payload): ActionReturnType => {
 });
 
 addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionReturnType => {
+  console.log("actionhandler of updatedraftinfo is hit",payload)
   const { tabId = getCurrentTabId(), ...update } = payload;
   const currentMessageList = selectCurrentMessageList(global, tabId);
   if (!currentMessageList) {
