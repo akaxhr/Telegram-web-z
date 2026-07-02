@@ -774,50 +774,44 @@ addActionHandler('clearDraft', (global, actions, payload): ActionReturnType => {
   });
 });
 
-addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionReturnType => {
-  console.log('=== updateDraftReplyInfo ===');
-  console.log('payload', payload);
+addActionHandler('updateDraftReplyInfo', (global, actions, payload) => {
+  console.log("STEP 1");
 
   const { tabId = getCurrentTabId(), ...update } = payload;
 
-  const currentMessageList = selectCurrentMessageList(global, tabId);
+  console.log("STEP 2");
+
+  let currentMessageList;
+  try {
+    currentMessageList = selectCurrentMessageList(global, tabId);
+    console.log("STEP 3", currentMessageList);
+  } catch (e) {
+    console.error("selectCurrentMessageList failed", e);
+    return;
+  }
+
   if (!currentMessageList) return;
 
-  const { chatId, threadId } = currentMessageList;
+  let currentDraft;
+  try {
+    currentDraft = selectDraft(global, currentMessageList.chatId, currentMessageList.threadId);
+    console.log("STEP 4", currentDraft);
+  } catch (e) {
+    console.error("selectDraft failed", e);
+    return;
+  }
 
-  const currentDraft = selectDraft(global, chatId, threadId);
+  try {
+    console.log(
+      "STEP 5",
+      selectChatMessage(global, currentMessageList.chatId, update.replyToMsgId)
+    );
+  } catch (e) {
+    console.error("selectChatMessage failed", e);
+    return;
+  }
 
-  console.log('currentMessageList', currentMessageList);
-  console.log('currentDraft', currentDraft);
-  console.log('chatId', chatId);
-  console.log('threadId', threadId);
-  console.log(
-    'selectChatMessage',
-    selectChatMessage(global, chatId, update.replyToMsgId),
-  );
-
-  const updatedReplyInfo = {
-    type: 'message',
-    ...currentDraft?.replyInfo,
-    ...update,
-  } as ApiInputMessageReplyInfo;
-
-  if (!updatedReplyInfo.replyToMsgId) return;
-
-  const newDraft: ApiDraft = {
-    ...currentDraft,
-    replyInfo: updatedReplyInfo,
-    suggestedPostInfo: undefined,
-  };
-
-  saveDraft({
-    global,
-    chatId,
-    threadId,
-    draft: newDraft,
-    isLocalOnly: true,
-    noLocalTimeUpdate: true,
-  });
+  console.log("STEP 6");
 });
 
 addActionHandler('resetDraftReplyInfo', (global, actions, payload): ActionReturnType => {
