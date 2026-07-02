@@ -722,7 +722,8 @@ addActionHandler('cancelUploadMedia', (global, actions, payload): ActionReturnTy
     });
   }
 });
-
+console.trace("updateDraftReplyInfo called");
+console.log(payload);
 addActionHandler('saveDraft', (global, actions, payload): ActionReturnType => {
   console.log("savedraft is being hit",global,actions,payload)
   const {
