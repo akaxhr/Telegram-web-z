@@ -162,18 +162,20 @@ async function loadMessagesByChat(payload = {}) {
   const offsetId = payload.offsetId ? Number(payload.offsetId) : undefined;
 
   let query = supabase
-    .from("tg_messages")
-    .select("*")
-    .eq("chat_id", chatId)
-    .eq("is_deleted", false)
-    .order("date", { ascending: true })
-    .order("id", { ascending: true });
+  .from("tg_messages")
+  .select("*")
+  .eq("chat_id", chatId)
+  .eq("is_deleted", false)
+  .order("date", { ascending: false })
+  .order("id", { ascending: false });
 
-  if (offsetId) query = query.lt("id", offsetId);
-  if (limit) query = query.limit(limit);
+if (offsetId) query = query.lt("id", offsetId);
+if (limit) query = query.limit(limit);
 
-  const { data: messageRows, error: msgError } = await query;
-  if (msgError) throw msgError;
+const { data: messageRows, error: msgError } = await query;
+if (msgError) throw msgError;
+
+const orderedRows = (messageRows ?? []).reverse();
 
   const senderIds = [
     ...new Set(
@@ -197,7 +199,7 @@ async function loadMessagesByChat(payload = {}) {
 
   if (chatError) throw chatError;
 
-  const messages = (messageRows ?? []).map(normalizeMessageRow).filter(Boolean);
+  const messages = orderedRows.map(normalizeMessageRow).filter(Boolean);
  const users = (userRows ?? []).map(normalizeUserRow).filter(Boolean);
 const userById = Object.fromEntries(users.map((u) => [u.id, u]));
 
