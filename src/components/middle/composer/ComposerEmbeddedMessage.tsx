@@ -145,6 +145,10 @@ const ComposerEmbeddedMessage = (props: OwnProps & StateProps) => {
     return false;
   })();
 
+
+  console.log("EmbeddedMessage");
+
+console.log(props);
   const {
     shouldRender, transitionClassNames, isClosing,
   } = useShowTransitionDeprecated(
