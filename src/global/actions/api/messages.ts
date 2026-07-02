@@ -722,7 +722,7 @@ addActionHandler('cancelUploadMedia', (global, actions, payload): ActionReturnTy
     });
   }
 });
-console.trace("updateDraftReplyInfo called");
+
 addActionHandler('saveDraft', (global, actions, payload): ActionReturnType => {
   console.trace("updateDraftReplyInfo called");
   console.log("savedraft is being hit",global,actions,payload)
@@ -773,7 +773,7 @@ addActionHandler('clearDraft', (global, actions, payload): ActionReturnType => {
     global, chatId, threadId, draft: newDraft, isLocalOnly,
   });
 });
-
+console.trace("updateDraftReplyInfo called 2");
 addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionReturnType => {
   console.log("actionhandler of updatedraftinfo is hit",payload,global,actions)
   const { tabId = getCurrentTabId(), ...update } = payload;
@@ -804,7 +804,7 @@ console.log("Action handler(updatedraftreplyinfo) last step before savedraft",ac
     global, chatId, threadId, draft: newDraft, isLocalOnly: true, noLocalTimeUpdate: true,
   });
 });
-
+console.trace("updateDraftReplyInfo called 3");
 addActionHandler('resetDraftReplyInfo', (global, actions, payload): ActionReturnType => {
   console.log("resetdraftreplyinfo is being hit ",global,actions,payload)
   const { tabId = getCurrentTabId() } = payload || {};
