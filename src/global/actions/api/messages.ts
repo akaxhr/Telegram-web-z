@@ -724,8 +724,6 @@ addActionHandler('cancelUploadMedia', (global, actions, payload): ActionReturnTy
 });
 
 addActionHandler('saveDraft', (global, actions, payload): ActionReturnType => {
-  console.trace("updateDraftReplyInfo called");
-  console.log("savedraft is being hit",global,actions,payload)
   const {
     chatId, threadId, text,
   } = payload;
@@ -734,7 +732,7 @@ addActionHandler('saveDraft', (global, actions, payload): ActionReturnType => {
     return;
   }
 
-  const currentDraft = selectDraft(global, chatId, threadId);
+  const crrentDraft = selectDraft(global, chatId, threadId);
 
   if (chat.isMonoforum && !currentDraft?.replyInfo && !currentDraft?.suggestedPostInfo) {
     return; // Monoforum doesn't support drafts outside threads
@@ -746,6 +744,15 @@ addActionHandler('saveDraft', (global, actions, payload): ActionReturnType => {
     effectId: currentDraft?.effectId,
     suggestedPostInfo: currentDraft?.suggestedPostInfo,
   };
+  console.log("saveDraft");
+
+console.log({
+    chatId,
+    threadId,
+    draft,
+    isLocalOnly,
+    noLocalTimeUpdate,
+});
 
   saveDraft({
     global, chatId, threadId, draft: newDraft,
@@ -2633,7 +2640,7 @@ addActionHandler('openChatOrTopicWithReplyInDraft', (global, actions, payload): 
     quoteText: replyingInfo.quoteText,
     quoteOffset: replyingInfo.quoteOffset,
   } as ApiInputMessageReplyInfo;
-
+console.log("newreplyinfo hit",newReplyInfo)
   const currentReplyInfo = replyingInfo.messageId
     ? newReplyInfo : selectDraft(global, currentChatId, currentThreadId)?.replyInfo;
   if (!currentReplyInfo) return;
