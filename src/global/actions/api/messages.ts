@@ -773,27 +773,28 @@ addActionHandler('clearDraft', (global, actions, payload): ActionReturnType => {
     global, chatId, threadId, draft: newDraft, isLocalOnly,
   });
 });
-console.trace("updateDraftReplyInfo called 2");
+
 addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionReturnType => {
-  console.log("=== updateDraftReplyInfo ===");
-console.log("payload", payload);
-console.log("currentMessageList", currentMessageList);
-console.log("currentDraft", currentDraft);
-console.log("chatId", chatId);
-console.log("threadId", threadId);
+  console.log('=== updateDraftReplyInfo ===');
+  console.log('payload', payload);
 
-const msg = selectChatMessage(global, chatId, payload.replyToMsgId);
-
-console.log("selectChatMessage()", msg);
   const { tabId = getCurrentTabId(), ...update } = payload;
+
   const currentMessageList = selectCurrentMessageList(global, tabId);
-  if (!currentMessageList) {
-    return;
-  }
+  if (!currentMessageList) return;
 
   const { chatId, threadId } = currentMessageList;
 
   const currentDraft = selectDraft(global, chatId, threadId);
+
+  console.log('currentMessageList', currentMessageList);
+  console.log('currentDraft', currentDraft);
+  console.log('chatId', chatId);
+  console.log('threadId', threadId);
+  console.log(
+    'selectChatMessage',
+    selectChatMessage(global, chatId, update.replyToMsgId),
+  );
 
   const updatedReplyInfo = {
     type: 'message',
@@ -808,12 +809,17 @@ console.log("selectChatMessage()", msg);
     replyInfo: updatedReplyInfo,
     suggestedPostInfo: undefined,
   };
-console.log("Action handler(updatedraftreplyinfo) last step before savedraft",actions,payload,global)
+
   saveDraft({
-    global, chatId, threadId, draft: newDraft, isLocalOnly: true, noLocalTimeUpdate: true,
+    global,
+    chatId,
+    threadId,
+    draft: newDraft,
+    isLocalOnly: true,
+    noLocalTimeUpdate: true,
   });
 });
-console.trace("updateDraftReplyInfo called 3");
+
 addActionHandler('resetDraftReplyInfo', (global, actions, payload): ActionReturnType => {
   console.log("resetdraftreplyinfo is being hit ",global,actions,payload)
   const { tabId = getCurrentTabId() } = payload || {};
