@@ -775,7 +775,16 @@ addActionHandler('clearDraft', (global, actions, payload): ActionReturnType => {
 });
 console.trace("updateDraftReplyInfo called 2");
 addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionReturnType => {
-  console.log("actionhandler of updatedraftinfo is hit",payload,global,actions)
+  console.log("=== updateDraftReplyInfo ===");
+console.log("payload", payload);
+console.log("currentMessageList", currentMessageList);
+console.log("currentDraft", currentDraft);
+console.log("chatId", chatId);
+console.log("threadId", threadId);
+
+const msg = selectChatMessage(global, chatId, payload.replyToMsgId);
+
+console.log("selectChatMessage()", msg);
   const { tabId = getCurrentTabId(), ...update } = payload;
   const currentMessageList = selectCurrentMessageList(global, tabId);
   if (!currentMessageList) {
