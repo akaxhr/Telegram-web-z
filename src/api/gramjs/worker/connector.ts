@@ -149,6 +149,15 @@ export async function callApi<T extends keyof Methods>(
 
   const methodName = String(fnName);
 
+  const workerOnlyMethods = new Set([
+  'sendMessage',
+  'sendMessageAction',
+  'markMessageListRead',
+  'updateIsOnline',
+  'saveDraft',
+  'requestChatUpdate',
+]);
+
   const acarthubMethods = new Set([
     'loadAllChats',
     'oldFetchLangPack',
