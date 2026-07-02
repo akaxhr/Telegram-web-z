@@ -724,6 +724,7 @@ addActionHandler('cancelUploadMedia', (global, actions, payload): ActionReturnTy
 });
 
 addActionHandler('saveDraft', (global, actions, payload): ActionReturnType => {
+  console.log("savedraft is being hit",global,actions,payload)
   const {
     chatId, threadId, text,
   } = payload;
@@ -797,13 +798,14 @@ addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionRetur
     replyInfo: updatedReplyInfo,
     suggestedPostInfo: undefined,
   };
-console.log("Action handler last step before savedraft",actions,payload,global)
+console.log("Action handler(updatedraftreplyinfo) last step before savedraft",actions,payload,global)
   saveDraft({
     global, chatId, threadId, draft: newDraft, isLocalOnly: true, noLocalTimeUpdate: true,
   });
 });
 
 addActionHandler('resetDraftReplyInfo', (global, actions, payload): ActionReturnType => {
+  console.log("resetdraftreplyinfo is being hit ",global,actions,payload)
   const { tabId = getCurrentTabId() } = payload || {};
   const currentMessageList = selectCurrentMessageList(global, tabId);
   if (!currentMessageList) {
@@ -820,7 +822,7 @@ addActionHandler('resetDraftReplyInfo', (global, actions, payload): ActionReturn
     ...currentDraft,
     replyInfo: undefined,
   };
-
+console.log("resetdraftreplyinfo last step before savedraft",global,actions,payload)
   saveDraft({
     global, chatId, threadId, draft: newDraft, isLocalOnly: Boolean(newDraft),
   });
