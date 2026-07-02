@@ -774,44 +774,43 @@ addActionHandler('clearDraft', (global, actions, payload): ActionReturnType => {
   });
 });
 
-addActionHandler('updateDraftReplyInfo', (global, actions, payload) => {
-  console.log("STEP 1");
-
+addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionReturnType => {
   const { tabId = getCurrentTabId(), ...update } = payload;
-
-  console.log("STEP 2");
-
-  let currentMessageList;
-  try {
-    currentMessageList = selectCurrentMessageList(global, tabId);
-    console.log("STEP 3", currentMessageList);
-  } catch (e) {
-    console.error("selectCurrentMessageList failed", e);
+  const currentMessageList = selectCurrentMessageList(global, tabId);
+  if (!currentMessageList) {
     return;
   }
 
-  if (!currentMessageList) return;
+  const { chatId, threadId } = currentMessageList;
 
-  let currentDraft;
-  try {
-    currentDraft = selectDraft(global, currentMessageList.chatId, currentMessageList.threadId);
-    console.log("STEP 4", currentDraft);
-  } catch (e) {
-    console.error("selectDraft failed", e);
-    return;
-  }
+  const currentDraft = selectDraft(global, chatId, threadId);
 
-  try {
-    console.log(
-      "STEP 5",
-      selectChatMessage(global, currentMessageList.chatId, update.replyToMsgId)
-    );
-  } catch (e) {
-    console.error("selectChatMessage failed", e);
-    return;
-  }
+  const updatedReplyInfo = {
+    type: 'message',
+    ...currentDraft?.replyInfo,
+    ...update,
+  } as ApiInputMessageReplyInfo;
 
-  console.log("STEP 6");
+  if (!updatedReplyInfo.replyToMsgId) return;
+
+console.group("ACTION updateDraftReplyInfo");
+
+console.log("payload", payload);
+
+console.log("draft BEFORE", currentDraft);
+
+console.log("newReplyInfo", updatedReplyInfo);
+
+
+  const newDraft: ApiDraft = {
+    ...currentDraft,
+    replyInfo: updatedReplyInfo,
+    suggestedPostInfo: undefined,
+  };
+console.log("draft AFTER", newDraft);
+  saveDraft({
+    global, chatId, threadId, draft: newDraft, isLocalOnly: true, noLocalTimeUpdate: true,
+  });
 });
 
 addActionHandler('resetDraftReplyInfo', (global, actions, payload): ActionReturnType => {
