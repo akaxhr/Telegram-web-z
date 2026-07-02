@@ -172,7 +172,6 @@ export default function useOuterHandlers(
         if (!startedAt || !canReply) {
           return;
         }
-
         updateDraftReplyInfo({ replyToMsgId: messageId });
 
         setTimeout(unmarkSwiped, Math.max(0, SWIPE_ANIMATION_DURATION - (Date.now() - startedAt)));

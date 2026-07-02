@@ -3,8 +3,8 @@ import { telegram } from "../../../../server/lib/telegram.js";
 
 const BOT_SENDER_ID = "bot";
 
-function makeMessageId(chatId, messageId) {
-  return Number(`${Math.abs(Number(chatId))}${messageId}`);
+function makeMessageId(ChatId, messageId) {
+  return Number(messageId);
 }
 
 function nowSec() {
