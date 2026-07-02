@@ -441,10 +441,18 @@ export const messageRoutes = {
   const text = payload.text || payload.message || "";
   const localId = payload.localMessage?.id;
 
-  const sent = await telegram.sendMessage({
-    chat_id: chatId,
-    text,
-  });
+  const replyInfo = payload.replyInfo;
+
+const sent = await telegram.sendMessage({
+  chat_id: chatId,
+  text,
+  ...(replyInfo?.replyToMsgId ? {
+    reply_parameters: {
+      message_id: Number(replyInfo.replyToMsgId),
+      allow_sending_without_reply: true,
+    },
+  } : {}),
+});
 
   const senderId = String(sent.from?.id || process.env.BOT_ID || "bot");
 
