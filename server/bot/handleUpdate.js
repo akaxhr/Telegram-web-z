@@ -12,7 +12,7 @@ function msgFromUpdate(update) {
 }
 
 function makeMessageId(chatId, messageId) {
-  return Number(`${Math.abs(Number(chatId))}${messageId}`);
+  return Number(messageId);
 }
 
 function contentFromMessage(msg) {
