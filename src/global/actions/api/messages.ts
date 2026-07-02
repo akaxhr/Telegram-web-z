@@ -797,7 +797,7 @@ addActionHandler('updateDraftReplyInfo', (global, actions, payload): ActionRetur
     replyInfo: updatedReplyInfo,
     suggestedPostInfo: undefined,
   };
-
+console.log("Action handler last step before savedraft",actions,payload,global)
   saveDraft({
     global, chatId, threadId, draft: newDraft, isLocalOnly: true, noLocalTimeUpdate: true,
   });
