@@ -990,6 +990,15 @@ const Composer = ({
     editingDraft,
   );
 
+    console.log("Composer Render");
+
+console.log({
+    draft,
+    replyInfo: draft?.replyInfo,
+    isReplying,
+    replyToMessage,
+});
+
   // Handle chat change (should be placed after `useDraft` and `useEditing`)
   const resetComposerRef = useStateRef(resetComposer);
   const stopRecordingVoiceRef = useStateRef(stopRecordingVoice);
