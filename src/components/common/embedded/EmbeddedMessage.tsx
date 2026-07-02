@@ -116,6 +116,10 @@ const EmbeddedMessage = ({
     requestedChatTranslationLanguage, requestedChatTranslationTone,
   );
 
+  
+  console.log("just EmbeddedMessage");
+
+console.log(EmbeddedMessage);
   const oldLang = useOldLang();
   const lang = useLang();
 
@@ -191,6 +195,7 @@ const EmbeddedMessage = ({
     if (noCaptions) {
       return lang('EmbeddedMessageNoCaption');
     }
+
 
     return (
       <MessageSummary
