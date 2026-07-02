@@ -214,30 +214,62 @@ TG_TELEGRAM_API_HASH: telegramApiHash || "ICHA_PANEL",
         clientFiles: isDevelopmentMode ? DEV_WARMUP_CLIENT_FILES : [],
       },
     },
+    esbuild: {
+  keepNames: true,
+},
     build: {
-      sourcemap: true,
-      assetsInlineLimit: (filePath) => (IMAGE_ASSET_RE.test(filePath) ? false : undefined),
-      rolldownOptions: {
-        output: {
-          manualChunks(id) {
-            if (id.includes('/src/components/ui/')) {
-              return 'shared-components';
-            }
-            return undefined;
-          },
-        },
+  sourcemap: true,
+
+  minify: false,
+  cssMinify: false,
+
+  reportCompressedSize: false,
+  chunkSizeWarningLimit: 10000,
+
+  assetsInlineLimit: (filePath) => (
+    IMAGE_ASSET_RE.test(filePath) ? false : undefined
+  ),
+
+  rolldownOptions: {
+    output: {
+      entryFileNames: '[name].js',
+      chunkFileNames: '[name].js',
+      assetFileNames: 'assets/[name][extname]',
+
+      manualChunks(id) {
+        if (id.includes('/src/components/ui/')) {
+          return 'shared-components';
+        }
+
+        if (id.includes('/src/lib/gramjs')) {
+          return 'gramjs';
+        }
+
+        if (id.includes('/src/global')) {
+          return 'global';
+        }
+
+        if (id.includes('/src/util')) {
+          return 'util';
+        }
+
+        return undefined;
       },
     },
+  },
+},
     worker: {
-      plugins: shouldCollectWorkerReportBundles ? () => [
-        createWorkerBundleCollectorPlugin(workerReportBundles),
-      ] : undefined,
-      rolldownOptions: {
-        output: {
-          entryFileNames: '[name]-[hash].js',
-        },
-      },
+  plugins: shouldCollectWorkerReportBundles
+    ? () => [createWorkerBundleCollectorPlugin(workerReportBundles)]
+    : undefined,
+
+  rolldownOptions: {
+    output: {
+      entryFileNames: '[name].js',
+      chunkFileNames: '[name].js',
     },
+  },
+},
     plugins,
   };
 });
